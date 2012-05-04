@@ -145,6 +145,15 @@ function newBoard() {
 	return fill(0, empty(), true);
 }
 
+function checkMove(direction) {
+	for (i = 0; i < this.blocks.length; i++) {
+		if (0 !== this.board[look[direction](this.blocks[i])]) {
+			return false;
+		}
+	}
+	return true;
+}
+
 function move(direction) {
 	var i, c;
 	c = [];
@@ -175,7 +184,8 @@ function newPiece(board, now) {
 		pending_drop: now + DROP_INTERVAL,
 		pending_settle: 0,
 		pending_moves: [],
-		move: move
+		move: move,
+		checkMove: checkMove
 	};
 }
 
@@ -195,23 +205,20 @@ function loop(board) {
 	}
 
 	if (current_piece.pending_settle) {
-		console.log("pending settle");
 		if (current_piece.pending_settle <= now) {
 			for (i = 0; i < current_piece.blocks.length; i++) {
 				// convert block to inactive
 				board[current_piece.blocks[i]] -= NUM_COLORS;
+				// todo: check for matches!
 			}
 			current_piece = false;
 		}
 	} else {
-		for (i = 0; i < current_piece.blocks.length; i++) {
-			if (0 !== board[look.down(current_piece.blocks[i])]) {
-				console.log("setting settle...");
-				current_piece.pending_settle = now;
-				current_piece.pending_drop = 0;
-			}
-		}
-		if (current_piece.pending_drop && current_piece.pending_drop <= now) {
+		if (!current_piece.checkMove("down")) {
+			console.log("setting settle...");
+			current_piece.pending_settle = now;
+			current_piece.pending_drop = 0;
+		} else if (current_piece.pending_drop && current_piece.pending_drop <= now) {
 			current_piece.move('down');
 			current_piece.pending_drop = now + DROP_INTERVAL;
 		}
