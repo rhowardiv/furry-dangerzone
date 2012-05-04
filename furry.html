@@ -41,6 +41,21 @@ var BOARD_WIDTH = 8,
 		down: function (n) { return Math.floor(n / BOARD_WIDTH) ? (n - BOARD_WIDTH) : -1; },
 		up: function (n) { return (BOARD_HEIGHT - Math.floor(n / BOARD_WIDTH) - 1) ? (n + BOARD_WIDTH) : -1; }
 	},
+	rotate_map = [ // this is how to rotate this piece in the possible orientations
+		[
+			function (n) { return n; },
+			function (n) { return look.up(look.left(n)); }
+		], [
+			function (n) { return look.right(n); },
+			function (n) { return look.down(n); }
+		], [
+			function (n) { return look.up(look.left(n)); },
+			function (n) { return n; }
+		], [
+			function (n) { return look.down(n); },
+			function (n) { return look.right(n); }
+		]
+	],
 	renderer = {
 		board_dom: null,
 		init: function () {
@@ -149,7 +164,10 @@ function newBoard() {
 function checkMove(direction) {
 	var l;
 	for (i = 0; i < this.blocks.length; i++) {
-		l = look[direction](this.blocks[i]);
+		l = direction === "rotate"
+		? rotate_map[this.orientation][i](this.blocks[i])
+		: look[direction](this.blocks[i]);
+
 		if (
 			0 !== this.board[l]
 			&& this.blocks.indexOf(l) === -1
@@ -168,10 +186,15 @@ function move(direction) {
 	for (i = 0; i < this.blocks.length; i++) {
 		c[i] = this.board[this.blocks[i]];
 		this.board[this.blocks[i]] = 0;
-		this.blocks[i] = look[direction](this.blocks[i]);
+		this.blocks[i] = direction === "rotate"
+		? rotate_map[this.orientation][i](this.blocks[i])
+		: look[direction](this.blocks[i]);
 	}
 	for (i = 0; i < c.length; i++) {
 		this.board[this.blocks[i]] = c[i];
+	}
+	if (direction ==="rotate") {
+		this.orientation = (1 + this.orientation) % 4;
 	}
 }
 
@@ -189,11 +212,12 @@ function newPiece(board, now) {
 	return {
 		board: board,
 		blocks: blocks,
+		orientation: 0,
 		pending_drop: now + DROP_INTERVAL,
 		pending_settle: 0,
 		pending_moves: [],
 		move: move,
-		checkMove: checkMove
+		checkMove: checkMove,
 	};
 }
 
@@ -265,7 +289,8 @@ onkeydown = function (e) {
 			// todo: move down
 			break;
 		default:
-			// todo: rotate!
+			console.log("queuing rotate ");
+			piece.pending_moves.unshift("rotate");
 			break;
 	}
 	return false;
