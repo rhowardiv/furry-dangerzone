@@ -26,14 +26,14 @@
 <div id="board"></div>
 <script>
 var BOARD_WIDTH = 8,
-	BOARD_HEIGHT = 16,
+	BOARD_HEIGHT = 17, // allow an extra top row for rotation
 	NUM_COLORS = 3,
 	NUM_TO_MATCH = 4, // pieces in a row required for "match"
 	DROP_INTERVAL = 900, // ms it takes an active piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
-	NEW_PIECE = [
-		(BOARD_HEIGHT - 1) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2) - 1,
-		(BOARD_HEIGHT - 1) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2)
+	NEW_PIECE = [// new pieces start middle of second row from top
+		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2) - 1,
+		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2)
 	],
 	look = {
 		left: function (n) { return (n % BOARD_WIDTH) ? (n - 1) : -1; },
@@ -88,7 +88,8 @@ var BOARD_WIDTH = 8,
 		}
 
 	},
-	current_piece
+	// currently active piece
+	piece
 ;
 
 function match(n, board, direction) {
@@ -146,11 +147,18 @@ function newBoard() {
 }
 
 function checkMove(direction) {
+	var l;
 	for (i = 0; i < this.blocks.length; i++) {
-		if (0 !== this.board[look[direction](this.blocks[i])]) {
+		l = look[direction](this.blocks[i]);
+		if (
+			0 !== this.board[l]
+			&& this.blocks.indexOf(l) === -1
+		) {
+			direction != "down" && console.log(direction + " denied");
 			return false;
 		}
 	}
+	direction != "down" && console.log(direction + " allowed");
 	return true;
 }
 
@@ -192,36 +200,40 @@ function newPiece(board, now) {
 function loop(board) {
 	var now = new Date * 1,
 		i,
-		bbl = []
+		bbl = [],
+		m
 	;
 
-	if (!current_piece) {
-		current_piece = newPiece(board, now);
-		if (!current_piece) {
+	if (!piece) {
+		piece = newPiece(board, now);
+		if (!piece) {
 			// GAME OVER
 			return;
 		}
-		board = current_piece.board;
+		board = piece.board;
 	}
 
-	if (current_piece.pending_settle) {
-		if (current_piece.pending_settle <= now) {
-			for (i = 0; i < current_piece.blocks.length; i++) {
+	if (piece.pending_settle) {
+		if (piece.pending_settle <= now) {
+			for (i = 0; i < piece.blocks.length; i++) {
 				// convert block to inactive
-				board[current_piece.blocks[i]] -= NUM_COLORS;
+				board[piece.blocks[i]] -= NUM_COLORS;
 				// todo: check for matches!
 			}
-			current_piece = false;
+			piece = false;
 			return next(board);
 		}
+	} else if (!piece.checkMove("down")) {
+		piece.pending_settle = now;
+		piece.pending_drop = 0;
+	} else if (piece.pending_drop && piece.pending_drop <= now) {
+		piece.move('down');
+		piece.pending_drop = now + DROP_INTERVAL;
 	}
-	if (!current_piece.checkMove("down")) {
-		console.log("setting settle...");
-		current_piece.pending_settle = now;
-		current_piece.pending_drop = 0;
-	} else if (current_piece.pending_drop && current_piece.pending_drop <= now) {
-		current_piece.move('down');
-		current_piece.pending_drop = now + DROP_INTERVAL;
+
+	m = piece.pending_moves.pop();
+	if (m && piece.checkMove(m)) {
+		piece.move(m);
 	}
 
 	next(board);
@@ -231,7 +243,7 @@ function next(board) {
 	renderer.render(board);
 	setTimeout(function () {
 		loop(board);
-	}, 100)
+	}, 10)
 }
 
 renderer.init();
@@ -242,11 +254,13 @@ onkeydown = function (e) {
 	var d;
 	switch (e.keyCode) {
 		case 37:
-			d = "left";
-			// passthru
+			console.log("queuing left ");
+			piece.pending_moves.unshift("left");
+			break;
 		case 39:
-			d = "right";
-			current_piece.pending_moves.unshift(d);
+			console.log("queuing right ");
+			piece.pending_moves.unshift("right");
+			break;
 		case 40:
 			// todo: move down
 			break;
@@ -254,5 +268,6 @@ onkeydown = function (e) {
 			// todo: rotate!
 			break;
 	}
+	return false;
 };
 </script>
