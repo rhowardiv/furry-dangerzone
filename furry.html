@@ -3,22 +3,60 @@
 var BOARD_WIDTH = 8,
 	BOARD_HEIGHT = 16,
 	NUM_COLORS = 3,
+	NUM_TO_MATCH = 4, // pieces in a row required for "match"
 	DROP_INTERVAL = 900, // ms it takes an active piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
 	current_piece // the piece currently being controlled by the player, if any
 ;
 
-function newBoard(w, h) {
-	
+function newBoard(w, h, c) {
+	var START_HEIGHT = 8, // max height to place starting yin pieces
+		START_DENSITY = 0.8, // density of pieces on starting board, between 0 (nothing) and 1 (completely full)
+		START_MAX_IN_A_ROW = 2; // don't allow more than this many pieces of the same color anywhere to start
+	;
+
+	function empty(w, h) {
+		var i, j, a = [];
+		for (i = 0; i < h; i++) {
+			a[i] = [];
+			for (j = 0; j < w; j++) {
+				a[i][j] = 0;
+			}
+		}
+		return a;
+	}
+
+	function fill(x, y, board) {
+		board[x][y] = 0;
+		if (Math.random() <= START_DENSITY) {
+			board[x][y] = Math.floor(Math.random() * (NUM_COLORS - 1) + 1);
+		}
+		if (y === START_HEIGHT - 1 && x === BOARD_WIDTH - 1) {
+			return board;
+		}
+
+		return x === BOARD_WIDTH
+		? fill(0, y+1, board)
+		: fill(++x, y, board);
+	}
+
+	return fill(0, 0, empty(BOARD_WIDTH, BOARD_HEIGHT));
 }
 
-function main() {
-	board = newBoard(BOARD_WIDTH, BOARD_HEIGHT);
+function render(board) {
+	var colors = ['black',
+		'#963',
+		'#399',
+		'#369'
+	];
 }
+
+console.log(newBoard(BOARD_WIDTH, BOARD_HEIGHT));
 
 function loop(board) {
 	setTimeout(function () {
 		loop(board);
 	})
 }
+
 </script>
