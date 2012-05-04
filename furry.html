@@ -7,13 +7,13 @@
 	.c0 {
 		background-color: black;
 	}
-	.c1 {
+	.c1, .c4 {
 		background-color: #933;
 	}
-	.c2 {
+	.c2, .c5 {
 		background-color: #993;
 	}
-	.c3 {
+	.c3, .c6 {
 		background-color: #339;
 	}
 </style>
@@ -25,6 +25,10 @@ var BOARD_WIDTH = 8,
 	NUM_TO_MATCH = 4, // pieces in a row required for "match"
 	DROP_INTERVAL = 900, // ms it takes an active piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
+	NEW_PIECE = [
+		(BOARD_HEIGHT - 1) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2) - 1,
+		(BOARD_HEIGHT - 1) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2)
+	],
 	current_piece, // the piece currently being controlled by the player, if any
 	look = {
 		left: function (n) { return (n % BOARD_WIDTH) ? (n - 1) : -1; },
@@ -135,7 +139,20 @@ function newBoard() {
 	return fill(0, empty(), true);
 }
 
+function newPiece(board) {
+	var i, p;
+	for (i = 0; i < NEW_PIECE.length; i++) {
+		if (board[NEW_PIECE[i]] !== 0) {
+			// GAME OVER
+			return [];
+		}
+		board[NEW_PIECE[i]] = Math.floor(Math.random() * (NUM_COLORS) + NUM_COLORS + 1);
+	}
+	return board;
+}
+
 function loop(board) {
+	board = newPiece(board);
 	renderer.render(board);
 	setTimeout(function () {
 		//loop(board);
