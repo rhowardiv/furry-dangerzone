@@ -1,4 +1,23 @@
 <!DOCTYPE html>
+<style>
+	#board {
+		position: relative;
+		margin: 0 auto;
+	}
+	.c0 {
+		background-color: black;
+	}
+	.c1 {
+		background-color: #963;
+	}
+	.c2 {
+		background-color: #399;
+	}
+	.c3 {
+		background-color: #369;
+	}
+</style>
+<div id="board"></div>
 <script>
 var BOARD_WIDTH = 8,
 	BOARD_HEIGHT = 16,
@@ -6,8 +25,55 @@ var BOARD_WIDTH = 8,
 	NUM_TO_MATCH = 4, // pieces in a row required for "match"
 	DROP_INTERVAL = 900, // ms it takes an active piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
-	current_piece // the piece currently being controlled by the player, if any
-;
+	current_piece, // the piece currently being controlled by the player, if any
+	renderer = {
+		board_dom: null,
+		init: function () {
+			this.board_dom = this.setupBoardDom(BOARD_WIDTH, BOARD_HEIGHT);
+
+		},
+		setupBoardDom: function (w, h) {
+			var board_dom = document.getElementById("board"),
+				screen_w = window.document.documentElement.clientWidth,
+				screen_h = window.document.documentElement.clientHeight,
+				block_size = Math.floor(Math.min(screen_w, screen_h) / Math.max(w, h)),
+				board_w = block_size * w,
+				board_h = block_size * h,
+				i, j, e
+			;
+
+			console.log("block_size: " + block_size);
+
+			board_dom.style.width = board_w + "px";
+			console.log("board_w: " + board_dom.style.width);
+			board_dom.style.height = board_h + "px";
+			console.log("board_h: " + board_dom.style.height);
+
+			for (i = 0; i < h; i++) {
+				for (j = 0; j < w; j++) {
+					e = document.createElement("div");
+					e.className = "c0";
+					e.style.position = "absolute";
+					e.style.bottom = i * block_size + "px";
+					e.style.left = j * block_size + "px";
+					e.style.width = block_size + "px";
+					e.style.height = block_size + "px";
+					board_dom.appendChild(e);
+					console.log(e);
+				}
+			}
+
+			return board_dom;
+		},
+
+		render: function (board) {
+			var i, c = this.board_dom.childNodes;
+			for (i = 0; i < board.length; i++) {
+				c[i].className = "c" + board[i];
+			}
+		}
+
+	};
 
 function newBoard(w, h, c) {
 	var START_HEIGHT = 8, // max height to place starting yin pieces
@@ -15,48 +81,39 @@ function newBoard(w, h, c) {
 		START_MAX_IN_A_ROW = 2; // don't allow more than this many pieces of the same color anywhere to start
 	;
 
+	// Create an empty board
 	function empty(w, h) {
-		var i, j, a = [];
-		for (i = 0; i < h; i++) {
-			a[i] = [];
-			for (j = 0; j < w; j++) {
-				a[i][j] = 0;
-			}
+		var i, a = [];
+		for (i = 0; i < w * h; i++) {
+			a.push(0);
 		}
 		return a;
 	}
 
-	function fill(x, y, board) {
-		board[x][y] = 0;
+	// Populate spots on the board
+	function fill(n, board) {
+		board[n] = 0;
 		if (Math.random() <= START_DENSITY) {
-			board[x][y] = Math.floor(Math.random() * (NUM_COLORS - 1) + 1);
-		}
-		if (y === START_HEIGHT - 1 && x === BOARD_WIDTH - 1) {
-			return board;
+			board[n] = Math.floor(Math.random() * (NUM_COLORS) + 1);
 		}
 
-		return x === BOARD_WIDTH
-		? fill(0, y+1, board)
-		: fill(++x, y, board);
+		//todo: check neighbors, don't make 3 in a row!
+
+		return (n == (START_HEIGHT * BOARD_WIDTH) - 1)
+		? board
+		: fill(++n, board);
 	}
 
-	return fill(0, 0, empty(BOARD_WIDTH, BOARD_HEIGHT));
+	return fill(0, empty(BOARD_WIDTH, BOARD_HEIGHT));
 }
-
-function render(board) {
-	var colors = ['black',
-		'#963',
-		'#399',
-		'#369'
-	];
-}
-
-console.log(newBoard(BOARD_WIDTH, BOARD_HEIGHT));
 
 function loop(board) {
 	setTimeout(function () {
 		loop(board);
 	})
 }
+
+renderer.init();
+renderer.render(newBoard(BOARD_WIDTH, BOARD_HEIGHT));
 
 </script>
