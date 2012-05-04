@@ -110,7 +110,8 @@ var BOARD_WIDTH = 8,
 	// currently active piece
 	piece,
 	cascade_pieces = [],
-	next_cascade = []
+	next_cascade = [],
+	cascade_hash = {}
 ;
 
 function match(n, board, direction) {
@@ -250,9 +251,11 @@ function loop(board) {
 		for (i = 0; i < cascade_pieces.length; i++) {
 			if (cascade_pieces[i].pending_drop <= now) {
 				cascade_pieces[i].move("down");
-				if (cascade_pieces[i].checkMove("down")) {
+				if (cascade_pieces[i].checkMove("down") || cascade_hash.hasOwnProperty(i - BOARD_WIDTH)) {
 					next_cascade.push(cascade_pieces[i]);
 					cascade_pieces[i].pending_drop = now + DROP_INTERVAL_CASCADE;
+				} else {
+					delete(cascade_hash[i]);
 				}
 			} else {
 				next_cascade.push(cascade_pieces[i]);
@@ -306,9 +309,10 @@ function loop(board) {
 				// A piece that was placed by a player can cascade
 				if (board[i] > NUM_COLORS && board[i] < (NUM_COLORS * 2) + 1) {
 					check_cascade = newCascadePiece(i, board);
-					if (check_cascade.checkMove("down") /* todo: OR if piece below is cascading */) {
+					if (check_cascade.checkMove("down") || cascade_hash.hasOwnProperty(i - BOARD_WIDTH)) {
 						check_cascade.pending_drop = now + DROP_INTERVAL_CASCADE;
 						cascade_pieces.push(check_cascade);
+						cascade_hash[i] = true;
 					}
 				}
 			}
