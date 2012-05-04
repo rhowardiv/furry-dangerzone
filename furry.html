@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<script>
+var BOARD_WIDTH = 8,
+	BOARD_HEIGHT = 16,
+	NUM_COLORS = 3,
+	DROP_INTERVAL = 900, // ms it takes an active piece to move down one space
+	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
+	current_piece // the piece currently being controlled by the player, if any
+;
+
+function newBoard(w, h) {
+	
+}
+
+function main() {
+	board = newBoard(BOARD_WIDTH, BOARD_HEIGHT);
+}
+
+function loop(board) {
+	setTimeout(function () {
+		loop(board);
+	})
+}
+</script>
