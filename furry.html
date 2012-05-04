@@ -4,16 +4,18 @@
 		position: relative;
 		margin: 0 auto;
 	}
+/* empty block */
 	.c0 {
 		background-color: black;
 	}
-	.c1, .c4 {
+/* non-player block, inactive player block, active player block */
+	.c1, .c4, .c7 {
 		background-color: #933;
 	}
-	.c2, .c5 {
+	.c2, .c5, .c8 {
 		background-color: #993;
 	}
-	.c3, .c6 {
+	.c3, .c6, .c9 {
 		background-color: #339;
 	}
 </style>
@@ -29,7 +31,6 @@ var BOARD_WIDTH = 8,
 		(BOARD_HEIGHT - 1) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2) - 1,
 		(BOARD_HEIGHT - 1) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2)
 	],
-	current_piece, // the piece currently being controlled by the player, if any
 	look = {
 		left: function (n) { return (n % BOARD_WIDTH) ? (n - 1) : -1; },
 		right: function (n) { return (BOARD_WIDTH - (n % BOARD_WIDTH) - 1) ? (n + 1) : -1; },
@@ -82,7 +83,8 @@ var BOARD_WIDTH = 8,
 			}
 		}
 
-	}
+	},
+	current_piece
 ;
 
 function match(n, board, direction) {
@@ -140,19 +142,34 @@ function newBoard() {
 }
 
 function newPiece(board) {
-	var i, p;
+	var i, blocks = [];
 	for (i = 0; i < NEW_PIECE.length; i++) {
 		if (board[NEW_PIECE[i]] !== 0) {
 			// GAME OVER
-			return [];
+			return;
 		}
-		board[NEW_PIECE[i]] = Math.floor(Math.random() * (NUM_COLORS) + NUM_COLORS + 1);
+		board[NEW_PIECE[i]] = Math.floor(Math.random() * (NUM_COLORS) + (NUM_COLORS * 2) + 1);
+		blocks.push[NEW_PIECE[i]];
 	}
-	return board;
+	return {
+		board: board,
+		blocks: blocks,
+		last_drop: new Date * 1,
+		pending_settle: 0,
+		pending_moves: [],
+	};
 }
 
 function loop(board) {
-	board = newPiece(board);
+	var now = new Date * 1;
+
+	current_piece = newPiece(board);
+	if (!current_piece) {
+		// GAME OVER
+		return;
+	}
+	board = current_piece.board;
+
 	renderer.render(board);
 	setTimeout(function () {
 		//loop(board);
@@ -162,6 +179,5 @@ function loop(board) {
 renderer.init();
 
 loop(newBoard(BOARD_WIDTH, BOARD_HEIGHT));
-
 
 </script>
