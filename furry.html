@@ -141,7 +141,20 @@ function newBoard() {
 	return fill(0, empty(), true);
 }
 
-function newPiece(board) {
+function move(direction) {
+	var i, c;
+	c = [];
+	for (i = 0; i < this.blocks.length; i++) {
+		c[i] = this.board[this.blocks[i]];
+		this.board[this.blocks[i]] = 0;
+		this.blocks[i] = look[direction](this.blocks[i]);
+	}
+	for (i = 0; i < c.length; i++) {
+		this.board[this.blocks[i]] = c[i];
+	}
+}
+
+function newPiece(board, now) {
 	var i, blocks = [];
 	for (i = 0; i < NEW_PIECE.length; i++) {
 		if (board[NEW_PIECE[i]] !== 0) {
@@ -149,31 +162,61 @@ function newPiece(board) {
 			return;
 		}
 		board[NEW_PIECE[i]] = Math.floor(Math.random() * (NUM_COLORS) + (NUM_COLORS * 2) + 1);
-		blocks.push[NEW_PIECE[i]];
+		blocks.push(NEW_PIECE[i]);
 	}
+
 	return {
 		board: board,
 		blocks: blocks,
-		last_drop: new Date * 1,
+		pending_drop: now + DROP_INTERVAL,
 		pending_settle: 0,
 		pending_moves: [],
+		move: move
 	};
 }
 
 function loop(board) {
-	var now = new Date * 1;
+	var now = new Date * 1,
+		i,
+		bbl = []
+	;
 
-	current_piece = newPiece(board);
 	if (!current_piece) {
-		// GAME OVER
-		return;
+		current_piece = newPiece(board, now);
+		if (!current_piece) {
+			// GAME OVER
+			return;
+		}
+		board = current_piece.board;
 	}
-	board = current_piece.board;
+
+	if (current_piece.pending_settle) {
+		console.log("pending settle");
+		if (current_piece.pending_settle <= now) {
+			for (i = 0; i < current_piece.blocks.length; i++) {
+				// convert block to inactive
+				board[current_piece.blocks[i]] -= NUM_COLORS;
+			}
+			current_piece = false;
+		}
+	} else {
+		for (i = 0; i < current_piece.blocks.length; i++) {
+			if (0 !== board[look.down(current_piece.blocks[i])]) {
+				console.log("setting settle...");
+				current_piece.pending_settle = now;
+				current_piece.pending_drop = 0;
+			}
+		}
+		if (current_piece.pending_drop && current_piece.pending_drop <= now) {
+			current_piece.move('down');
+			current_piece.pending_drop = now + DROP_INTERVAL;
+		}
+	}
 
 	renderer.render(board);
 	setTimeout(function () {
-		//loop(board);
-	})
+		loop(board);
+	}, 100)
 }
 
 renderer.init();
