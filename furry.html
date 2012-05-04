@@ -212,18 +212,22 @@ function loop(board) {
 				// todo: check for matches!
 			}
 			current_piece = false;
-		}
-	} else {
-		if (!current_piece.checkMove("down")) {
-			console.log("setting settle...");
-			current_piece.pending_settle = now;
-			current_piece.pending_drop = 0;
-		} else if (current_piece.pending_drop && current_piece.pending_drop <= now) {
-			current_piece.move('down');
-			current_piece.pending_drop = now + DROP_INTERVAL;
+			return next(board);
 		}
 	}
+	if (!current_piece.checkMove("down")) {
+		console.log("setting settle...");
+		current_piece.pending_settle = now;
+		current_piece.pending_drop = 0;
+	} else if (current_piece.pending_drop && current_piece.pending_drop <= now) {
+		current_piece.move('down');
+		current_piece.pending_drop = now + DROP_INTERVAL;
+	}
 
+	next(board);
+}
+
+function next(board) {
 	renderer.render(board);
 	setTimeout(function () {
 		loop(board);
@@ -234,4 +238,21 @@ renderer.init();
 
 loop(newBoard(BOARD_WIDTH, BOARD_HEIGHT));
 
+onkeydown = function (e) {
+	var d;
+	switch (e.keyCode) {
+		case 37:
+			d = "left";
+			// passthru
+		case 39:
+			d = "right";
+			current_piece.pending_moves.unshift(d);
+		case 40:
+			// todo: move down
+			break;
+		default:
+			// todo: rotate!
+			break;
+	}
+};
 </script>
