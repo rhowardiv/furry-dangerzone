@@ -294,19 +294,16 @@ onkeydown = function (e) {
 	var d;
 	switch (e.keyCode) {
 		case 37:
-			console.log("queuing left ");
-			piece.pending_moves.unshift("left");
+			piece && piece.pending_moves.unshift("left");
 			break;
 		case 39:
-			console.log("queuing right ");
-			piece.pending_moves.unshift("right");
+			piece && piece.pending_moves.unshift("right");
 			break;
 		case 40:
-			// todo: move down
+			piece && piece.pending_moves.unshift("down");
 			break;
 		default:
-			console.log("queuing rotate ");
-			piece.pending_moves.unshift("rotate");
+			piece && piece.pending_moves.unshift("rotate");
 			break;
 	}
 	return false;
