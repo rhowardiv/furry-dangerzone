@@ -274,6 +274,9 @@ function loop(board) {
 	m = piece.pending_moves.pop();
 	if (m && piece.checkMove(m)) {
 		piece.move(m);
+		if (m === "down") {
+			piece.pending_drop = now + DROP_INTERVAL;
+		}
 	}
 
 	next(board);
