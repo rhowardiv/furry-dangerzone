@@ -30,6 +30,7 @@ var BOARD_WIDTH = 8,
 	NUM_COLORS = 3,
 	NUM_TO_MATCH = 4, // pieces in a row required for "match"
 	DROP_INTERVAL = 900, // ms it takes an active piece to move down one space
+	DROP_INTERVAL_CASCADE = 500, // ms it takes a "cascading" piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
 	NEW_PIECE = [// new pieces start middle of second row from top
 		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2) - 1,
@@ -90,6 +91,7 @@ var BOARD_WIDTH = 8,
 					e.style.left = j * block_size + "px";
 					e.style.width = block_size + "px";
 					e.style.height = block_size + "px";
+					e.innerHTML = (i * BOARD_WIDTH) + j;
 					board_dom.appendChild(e);
 				}
 			}
@@ -106,7 +108,9 @@ var BOARD_WIDTH = 8,
 
 	},
 	// currently active piece
-	piece
+	piece,
+	cascade_pieces = [],
+	next_cascade = []
 ;
 
 function match(n, board, direction) {
@@ -174,7 +178,6 @@ function checkMove(direction) {
 			0 !== this.board[l]
 			&& this.blocks.indexOf(l) === -1
 		) {
-			direction != "down" && console.log(direction + " denied");
 			return false;
 		}
 	}
@@ -222,14 +225,42 @@ function newPiece(board, now) {
 	};
 }
 
+function newCascadePiece(n, board) {
+	return {
+		board: board,
+		blocks: [n],
+		pending_drop: 0,
+		move: move,
+		checkMove: checkMove
+	};
+}
+
 function loop(board) {
 	var now = new Date * 1,
 		i, j,
 		bbl = [],
 		m,
 		check_match = [],
-		matches = []
+		matches = [],
+		check_cascade
 	;
+
+	if (cascade_pieces.length > 0) {
+		next_cascade = [];
+		for (i = 0; i < cascade_pieces.length; i++) {
+			if (cascade_pieces[i].pending_drop <= now) {
+				cascade_pieces[i].move("down");
+				if (cascade_pieces[i].checkMove("down")) {
+					next_cascade.push(cascade_pieces[i]);
+					cascade_pieces[i].pending_drop = now + DROP_INTERVAL_CASCADE;
+				}
+			} else {
+				next_cascade.push(cascade_pieces[i]);
+			}
+		}
+		cascade_pieces = next_cascade;
+		return next(board);
+	}
 
 	if (!piece) {
 		piece = newPiece(board, now);
@@ -269,6 +300,19 @@ function loop(board) {
 
 			// deactivate the piece
 			piece = false;
+
+			// check for cascade pieces
+			if (matches.length > 0) for (i = 0; i < board.length; i++) {
+				// A piece that was placed by a player can cascade
+				if (board[i] > NUM_COLORS && board[i] < (NUM_COLORS * 2) + 1) {
+					check_cascade = newCascadePiece(i, board);
+					if (check_cascade.checkMove("down") /* todo: OR if piece below is cascading */) {
+						check_cascade.pending_drop = now + DROP_INTERVAL_CASCADE;
+						cascade_pieces.push(check_cascade);
+					}
+				}
+			}
+
 			return next(board);
 		}
 	} else if (!piece.checkMove("down")) {
