@@ -223,9 +223,11 @@ function newPiece(board, now) {
 
 function loop(board) {
 	var now = new Date * 1,
-		i,
+		i, j,
 		bbl = [],
-		m
+		m,
+		check_match = [],
+		matches = []
 	;
 
 	if (!piece) {
@@ -242,7 +244,21 @@ function loop(board) {
 			for (i = 0; i < piece.blocks.length; i++) {
 				// convert block to inactive
 				board[piece.blocks[i]] -= NUM_COLORS;
-				// todo: check for matches!
+
+				// check for matches!
+				for (j in look) {
+					if (look.hasOwnProperty(j)) {
+						check_match = match(piece.blocks[i], board, j);
+						if (check_match.length >= NUM_TO_MATCH) {
+							matches = matches.concat(check_match);
+						}
+					}
+				}
+				if (matches.length > 0) {
+					for (j = 0; j < matches.length; j++) {
+						board[matches[j]] = 0;
+					}
+				}
 			}
 			piece = false;
 			return next(board);
