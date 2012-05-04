@@ -102,52 +102,49 @@ function match(n, board, direction) {
 	return m;
 }
 
-function newBoard(w, h, c) {
+function newBoard() {
 	var START_HEIGHT = 8, // max height to place starting yin pieces
 		START_DENSITY = 0.8, // density of pieces on starting board, between 0 (nothing) and 1 (completely full)
 		START_MAX_IN_A_ROW = 2; // don't allow more than this many pieces of the same color anywhere to start
 	;
 
 	// Create an empty board
-	function empty(w, h) {
+	function empty() {
 		var i, a = [];
-		for (i = 0; i < w * h; i++) {
+		for (i = 0; i < BOARD_WIDTH * BOARD_HEIGHT; i++) {
 			a.push(0);
 		}
 		return a;
 	}
 
 	// Populate spots on the board
-	function fill(n, board) {
+	function fill(n, board, allow_empty) {
 		board[n] = 0;
-		if (Math.random() <= START_DENSITY) {
+		if (allow_empty && Math.random() <= START_DENSITY) {
 			board[n] = Math.floor(Math.random() * (NUM_COLORS) + 1);
 		}
 
 		return (n == (START_HEIGHT * BOARD_WIDTH) - 1)
 		? board
-		: fill(
-			// Check for too many matches w/ existing blocks
-			(match(n, board, 'left').length <= START_MAX_IN_A_ROW && match(n, board, 'down').length <= START_MAX_IN_A_ROW)
-			? ++n
-			//try again
-			: n,
-			board
+		: ((match(n, board, 'left').length <= START_MAX_IN_A_ROW && match(n, board, 'down').length <= START_MAX_IN_A_ROW)
+			? fill(++n, board, true)
+			: fill(n, board, false)
 		);
 	}
 
-	return fill(0, empty(BOARD_WIDTH, BOARD_HEIGHT));
+	return fill(0, empty(), true);
 }
 
 function loop(board) {
+	renderer.render(board);
 	setTimeout(function () {
-		loop(board);
+		//loop(board);
 	})
 }
 
 renderer.init();
 
-renderer.render(board = newBoard(BOARD_WIDTH, BOARD_HEIGHT));
+loop(newBoard(BOARD_WIDTH, BOARD_HEIGHT));
 
 
 </script>
