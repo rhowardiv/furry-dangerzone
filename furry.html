@@ -26,6 +26,12 @@ var BOARD_WIDTH = 8,
 	DROP_INTERVAL = 900, // ms it takes an active piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
 	current_piece, // the piece currently being controlled by the player, if any
+	look = {
+		left: function (n) { return (n % BOARD_WIDTH) ? (n - 1) : -1; },
+		right: function (n) { return (BOARD_WIDTH - (n % BOARD_WIDTH) - 1) ? (n + 1) : -1; },
+		down: function (n) { return Math.floor(n / BOARD_WIDTH) ? (n - BOARD_WIDTH) : -1; },
+		up: function (n) { return (BOARD_HEIGHT - Math.floor(n / BOARD_WIDTH) - 1) ? (n + BOARD_WIDTH) : -1; }
+	},
 	renderer = {
 		board_dom: null,
 		init: function () {
@@ -59,7 +65,6 @@ var BOARD_WIDTH = 8,
 					e.style.width = block_size + "px";
 					e.style.height = block_size + "px";
 					board_dom.appendChild(e);
-					console.log(e);
 				}
 			}
 
@@ -73,7 +78,29 @@ var BOARD_WIDTH = 8,
 			}
 		}
 
-	};
+	}
+;
+
+function match(n, board, direction) {
+	var l, m;
+
+	if (board[n] === 0) {
+		return [];
+	}
+
+	l = look[direction](n);
+	if (
+		l === -1
+		|| (board[n] % NUM_COLORS) !== (board[l] % NUM_COLORS)
+	) {
+		return [n];
+	}
+
+	// l matches so keep looking that way
+	m = match(l, board, direction);
+	m.unshift(n);
+	return m;
+}
 
 function newBoard(w, h, c) {
 	var START_HEIGHT = 8, // max height to place starting yin pieces
@@ -97,11 +124,16 @@ function newBoard(w, h, c) {
 			board[n] = Math.floor(Math.random() * (NUM_COLORS) + 1);
 		}
 
-		//todo: check neighbors, don't make 3 in a row!
-
 		return (n == (START_HEIGHT * BOARD_WIDTH) - 1)
 		? board
-		: fill(++n, board);
+		: fill(
+			// Check for too many matches w/ existing blocks
+			(match(n, board, 'left').length <= START_MAX_IN_A_ROW && match(n, board, 'down').length <= START_MAX_IN_A_ROW)
+			? ++n
+			//try again
+			: n,
+			board
+		);
 	}
 
 	return fill(0, empty(BOARD_WIDTH, BOARD_HEIGHT));
@@ -114,6 +146,8 @@ function loop(board) {
 }
 
 renderer.init();
-renderer.render(newBoard(BOARD_WIDTH, BOARD_HEIGHT));
+
+renderer.render(board = newBoard(BOARD_WIDTH, BOARD_HEIGHT));
+
 
 </script>
