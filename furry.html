@@ -41,6 +41,12 @@ var BOARD_WIDTH = 8,
 		down: function (n) { return Math.floor(n / BOARD_WIDTH) ? (n - BOARD_WIDTH) : -1; },
 		up: function (n) { return (BOARD_HEIGHT - Math.floor(n / BOARD_WIDTH) - 1) ? (n + BOARD_WIDTH) : -1; }
 	},
+	direction_opposites = {
+		left: "right",
+		right: "left",
+		down: "up",
+		up: "down"
+	},
 	rotate_map = [ // this is how to rotate this piece in the possible orientations
 		[
 			function (n) { return n; },
@@ -72,12 +78,8 @@ var BOARD_WIDTH = 8,
 				i, j, e
 			;
 
-			console.log("block_size: " + block_size);
-
 			board_dom.style.width = board_w + "px";
-			console.log("board_w: " + board_dom.style.width);
 			board_dom.style.height = board_h + "px";
-			console.log("board_h: " + board_dom.style.height);
 
 			for (i = 0; i < h; i++) {
 				for (j = 0; j < w; j++) {
@@ -176,7 +178,6 @@ function checkMove(direction) {
 			return false;
 		}
 	}
-	direction != "down" && console.log(direction + " allowed");
 	return true;
 }
 
@@ -241,15 +242,20 @@ function loop(board) {
 
 	if (piece.pending_settle) {
 		if (piece.pending_settle <= now) {
+			// convert piece blocks to inactive
 			for (i = 0; i < piece.blocks.length; i++) {
-				// convert block to inactive
 				board[piece.blocks[i]] -= NUM_COLORS;
+			}
 
-				// check for matches!
+			// check for matches!
+			for (i = 0; i < piece.blocks.length; i++) {
 				for (j in look) {
 					if (look.hasOwnProperty(j)) {
-						check_match = match(piece.blocks[i], board, j);
-						if (check_match.length >= NUM_TO_MATCH) {
+						check_match = match(piece.blocks[i], board, j)
+							// a match must include the opposite direction
+							.concat(match(piece.blocks[i], board, direction_opposites[j]));
+						// - 1 because the current block is included twice
+						if (check_match.length - 1 >= NUM_TO_MATCH) {
 							matches = matches.concat(check_match);
 						}
 					}
@@ -260,6 +266,8 @@ function loop(board) {
 					}
 				}
 			}
+
+			// deactivate the piece
 			piece = false;
 			return next(board);
 		}
@@ -274,8 +282,15 @@ function loop(board) {
 	m = piece.pending_moves.pop();
 	if (m && piece.checkMove(m)) {
 		piece.move(m);
-		if (m === "down") {
+		if (m === "down" && piece.checkMove("down")) {
 			piece.pending_drop = now + DROP_INTERVAL;
+		} else {
+			if (piece.pending_settle && piece.checkMove("down")) {
+				// Unset the settle timer and re-set drop timer if the move has
+				// resulted in more possible down moves.
+				piece.pending_settle = 0;
+				piece.pending_drop = now + DROP_INTERVAL;
+			}
 		}
 	}
 
@@ -286,7 +301,7 @@ function next(board) {
 	renderer.render(board);
 	setTimeout(function () {
 		loop(board);
-	}, 10)
+	}, 20)
 }
 
 renderer.init();
@@ -317,6 +332,10 @@ onkeydown = function (e) {
 		case 13: // enter
 		case 16: // shift
 			piece && piece.pending_moves.unshift("rotate");
+			return false;
+		case 27: // ESC
+			// debug -- STOP!!
+			next = null;
 			return false;
 		default:
 			return true;
