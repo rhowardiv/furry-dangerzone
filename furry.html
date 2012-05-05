@@ -8,19 +8,28 @@
 	div {
 		-webkit-border-radius: 4px;
 	}
-/* empty block */
 	.c0 {
 		background-color: black;
 	}
-/* non-player block, inactive player block, active player block */
-	.c1, .c4, .c7 {
+/* non-player blocks, inactive player block, active player block */
+	.c1 {
 		background-color: #933;
 	}
-	.c2, .c5, .c8 {
+	.c2 {
 		background-color: #993;
 	}
-	.c3, .c6, .c9 {
+	.c3 {
 		background-color: #339;
+	}
+/* inactive player block, active player block */
+	.c4, .c7 {
+		background-color: #c66;
+	}
+	.c5, .c8 {
+		background-color: #cc6;
+	}
+	.c6, .c9 {
+		background-color: #66c;
 	}
 </style>
 <div id="board"></div>
@@ -30,7 +39,7 @@ var BOARD_WIDTH = 8,
 	NUM_COLORS = 3,
 	NUM_TO_MATCH = 4, // pieces in a row required for "match"
 	DROP_INTERVAL = 900, // ms it takes an active piece to move down one space
-	DROP_INTERVAL_CASCADE = 500, // ms it takes a "cascading" piece to move down one space
+	DROP_INTERVAL_CASCADE = 900, // ms it takes a "cascading" piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
 	NEW_PIECE = [// new pieces start middle of second row from top
 		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2) - 1,
@@ -107,15 +116,14 @@ var BOARD_WIDTH = 8,
 		}
 
 	},
-	// currently active piece
-	piece,
-	cascade_pieces = [],
-	next_cascade = [],
-	cascade_hash = {}
+	board,
+	piece, // controllable piece
+	npps = [], // "non-player pieces"
+	next_npps = []
 ;
 
-function match(n, board, direction) {
-	var l, m;
+function match(n, direction) {
+	var l;
 
 	if (board[n] === 0) {
 		return [];
@@ -130,9 +138,23 @@ function match(n, board, direction) {
 	}
 
 	// l matches so keep looking that way
-	m = match(l, board, direction);
-	m.unshift(n);
-	return m;
+	return [n].concat(match(l, direction));
+}
+
+function cascade(n) {
+	function canCascade(n) {
+		// only player-placed blocks can cascade
+		return (board[n] > NUM_COLORS) && (board[n] <= (NUM_COLORS * 2));
+	}
+
+	if (!canCascade(n)) {
+		console.log(n + " : " + board[n]);
+		return [];
+	}
+
+	console.log(n + " can cascade!");
+
+	return [n].concat(cascade(look.up(n)));
 }
 
 function newBoard() {
@@ -159,7 +181,7 @@ function newBoard() {
 
 		return (n == (START_HEIGHT * BOARD_WIDTH) - 1)
 		? board
-		: ((match(n, board, 'left').length <= START_MAX_IN_A_ROW && match(n, board, 'down').length <= START_MAX_IN_A_ROW)
+		: ((match(n, 'left').length <= START_MAX_IN_A_ROW && match(n, 'down').length <= START_MAX_IN_A_ROW)
 			? fill(++n, board, true)
 			: fill(n, board, false)
 		);
@@ -176,7 +198,7 @@ function checkMove(direction) {
 		: look[direction](this.blocks[i]);
 
 		if (
-			0 !== this.board[l]
+			0 !== board[l]
 			&& this.blocks.indexOf(l) === -1
 		) {
 			return false;
@@ -189,21 +211,21 @@ function move(direction) {
 	var i, c;
 	c = [];
 	for (i = 0; i < this.blocks.length; i++) {
-		c[i] = this.board[this.blocks[i]];
-		this.board[this.blocks[i]] = 0;
+		c[i] = board[this.blocks[i]];
+		board[this.blocks[i]] = 0;
 		this.blocks[i] = direction === "rotate"
 		? rotate_map[this.orientation][i](this.blocks[i])
 		: look[direction](this.blocks[i]);
 	}
 	for (i = 0; i < c.length; i++) {
-		this.board[this.blocks[i]] = c[i];
+		board[this.blocks[i]] = c[i];
 	}
 	if (direction ==="rotate") {
 		this.orientation = (1 + this.orientation) % 4;
 	}
 }
 
-function newPiece(board, now) {
+function newPiece(now) {
 	var i, blocks = [];
 	for (i = 0; i < NEW_PIECE.length; i++) {
 		if (board[NEW_PIECE[i]] !== 0) {
@@ -215,7 +237,6 @@ function newPiece(board, now) {
 	}
 
 	return {
-		board: board,
 		blocks: blocks,
 		orientation: 0,
 		pending_drop: now + DROP_INTERVAL,
@@ -226,9 +247,8 @@ function newPiece(board, now) {
 	};
 }
 
-function newCascadePiece(n, board) {
+function newNpp(n) {
 	return {
-		board: board,
 		blocks: [n],
 		pending_drop: 0,
 		move: move,
@@ -236,41 +256,61 @@ function newCascadePiece(n, board) {
 	};
 }
 
-function loop(board) {
+function nppSort(npp1, npp2) {
+	return npp1.blocks[0] - npp2.blocks[0]; 
+}
+
+function nppsUnique(npps) {
+	var i, c = {}, n = [];
+	for (i = 0; i < npps.length; i++) {
+		if (!c.hasOwnProperty(npps[i].blocks[0])) {
+			c[npps[i].blocks[0]] = true;
+			n.push(npps[i]);
+		}
+	}
+	return n;
+}
+
+function loop() {
 	var now = new Date * 1,
 		i, j,
 		m,
 		check_match = [],
-		matches = [],
-		check_cascade
+		matches = []
 	;
 
-	if (cascade_pieces.length > 0) {
-		next_cascade = [];
-		for (i = 0; i < cascade_pieces.length; i++) {
-			if (cascade_pieces[i].pending_drop <= now) {
-				cascade_pieces[i].move("down");
-				if (cascade_pieces[i].checkMove("down") || cascade_hash.hasOwnProperty(i - BOARD_WIDTH)) {
-					next_cascade.push(cascade_pieces[i]);
-					cascade_pieces[i].pending_drop = now + DROP_INTERVAL_CASCADE;
+	if (npps.length > 0) {
+
+		// we must move the lowest npps first
+		npps = nppsUnique(npps);
+		npps.sort(nppSort);
+
+		next_npps = [];
+		for (i = 0; i < npps.length; i++) {
+			if (npps[i].pending_drop <= now) {
+				npps[i].move("down");
+				if (npps[i].checkMove("down")) {
+					npps[i].pending_drop = now + DROP_INTERVAL_CASCADE;
+					next_npps.push(npps[i]);
 				} else {
-					delete(cascade_hash[i]);
+					console.log("ndm for " + npps[i].blocks[0]);
+					console.log(board[look.down(npps[i].blocks[0])]);
+					//todo: check for matches!
 				}
 			} else {
-				next_cascade.push(cascade_pieces[i]);
+				next_npps.push(npps[i]);
 			}
 		}
-		cascade_pieces = next_cascade;
-		return next(board);
+		npps = next_npps;
+		return next(DROP_INTERVAL_CASCADE);
 	}
 
 	if (!piece) {
-		piece = newPiece(board, now);
+		piece = newPiece(now);
 		if (!piece) {
 			// GAME OVER
 			return;
 		}
-		board = piece.board;
 	}
 
 	if (piece.pending_settle) {
@@ -280,13 +320,12 @@ function loop(board) {
 				board[piece.blocks[i]] -= NUM_COLORS;
 			}
 
-			// check for matches!
 			for (i = 0; i < piece.blocks.length; i++) {
 				for (j in look) {
 					if (look.hasOwnProperty(j)) {
-						check_match = match(piece.blocks[i], board, j)
+						check_match = match(piece.blocks[i], j)
 							// a match must include the opposite direction
-							.concat(match(piece.blocks[i], board, direction_opposites[j]));
+							.concat(match(piece.blocks[i], direction_opposites[j]));
 						// - 1 because the current block is included twice
 						if (check_match.length - 1 >= NUM_TO_MATCH) {
 							matches = matches.concat(check_match);
@@ -300,23 +339,32 @@ function loop(board) {
 				}
 			}
 
-			// deactivate the piece
 			piece = false;
 
-			// check for cascade pieces
-			if (matches.length > 0) for (i = 0; i < board.length; i++) {
-				// A piece that was placed by a player can cascade
-				if (board[i] > NUM_COLORS && board[i] < (NUM_COLORS * 2) + 1) {
-					check_cascade = newCascadePiece(i, board);
-					if (check_cascade.checkMove("down") || cascade_hash.hasOwnProperty(i - BOARD_WIDTH)) {
-						check_cascade.pending_drop = now + DROP_INTERVAL_CASCADE;
-						cascade_pieces.push(check_cascade);
-						cascade_hash[i] = true;
+			if (matches.length > 0) for (i = 0; i < matches.length; i++) {
+				// just throwing the numbers on the array;
+				// we'll convert them to npp objects as needed
+				cascade(look.up(matches[i])).forEach(function (npp) {
+					var new_npp = newNpp(npp);
+					new_npp.pending_drop = now + DROP_INTERVAL;
+					npps = npps.concat(new_npp);
+				});
+				["left", "right"].forEach (function (dir) {
+					var l = look[dir](matches[i]),
+						new_npp = (l > 0) ? newNpp(l) : false;
+					if (new_npp && new_npp.checkMove("down")) {
+						cascade(
+							new_npp.blocks[0]
+						).forEach(function (npp) {
+							var new_npp = newNpp(npp);
+							new_npp.pending_drop = now + DROP_INTERVAL_CASCADE;
+							npps = npps.concat(new_npp);
+						});
 					}
-				}
+				});
 			}
 
-			return next(board);
+			return next();
 		}
 	} else if (!piece.checkMove("down")) {
 		piece.pending_settle = now + SETTLE_INTERVAL;
@@ -341,37 +389,41 @@ function loop(board) {
 		}
 	}
 
-	next(board);
+	next();
 }
 
-function next(board) {
+function next(interval) {
 	renderer.render(board);
-	setTimeout(function () {
-		loop(board);
-	}, 20)
+	setTimeout(
+		function () {
+			loop();
+		},
+		(arguments.length > 1) ? interval : 20
+	);
 }
 
 renderer.init();
 
-loop(newBoard(BOARD_WIDTH, BOARD_HEIGHT));
+board = newBoard(BOARD_WIDTH, BOARD_HEIGHT);
+loop();
 
 onkeydown = function (e) {
 	var d;
 	switch (e.keyCode) {
-		case 37:
-		case 65: "a"
+		case 37: // left arrow
+		case 65: // "a"
 			piece && piece.pending_moves.unshift("left");
 			return false;
-		case 39:
-		case 68: "d"
+		case 39: // right arrow
+		case 68: // "d"
 			piece && piece.pending_moves.unshift("right");
 			return false;
-		case 40:
-		case 83: "s"
+		case 40: // down arrow
+		case 83: // "s"
 			piece && piece.pending_moves.unshift("down");
 			return false;
 		case 38: // up arrow
-		case 87: "w"
+		case 87: // "w"
 			// todo: instaplace
 			return false;
 		case 32: // space
