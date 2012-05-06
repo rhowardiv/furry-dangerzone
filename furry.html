@@ -154,7 +154,7 @@ function cascade(n) {
 	return [n].concat(cascade(look.up(n)));
 }
 
-function newBoard() {
+function initBoard() {
 	var START_HEIGHT = 8, // max height to place starting yin pieces
 		START_DENSITY = 0.8, // density of pieces on starting board, between 0 (nothing) and 1 (completely full)
 		START_MAX_IN_A_ROW = 2; // don't allow more than this many pieces of the same color anywhere to start
@@ -170,7 +170,7 @@ function newBoard() {
 	}
 
 	// Populate spots on the board
-	function fill(n, board, allow_empty) {
+	function fill(n, allow_empty) {
 		board[n] = 0;
 		if (allow_empty && Math.random() <= START_DENSITY) {
 			board[n] = Math.floor(Math.random() * (NUM_COLORS) + 1);
@@ -179,12 +179,13 @@ function newBoard() {
 		return (n == (START_HEIGHT * BOARD_WIDTH) - 1)
 		? board
 		: ((match(n, 'left').length <= START_MAX_IN_A_ROW && match(n, 'down').length <= START_MAX_IN_A_ROW)
-			? fill(++n, board, true)
-			: fill(n, board, false)
+			? fill(++n, true)
+			: fill(n, false)
 		);
 	}
 
-	return fill(0, empty(), true);
+	board = empty();
+	fill(0, true);
 }
 
 function checkMove(direction) {
@@ -414,7 +415,7 @@ function next(interval) {
 
 renderer.init();
 
-board = newBoard(BOARD_WIDTH, BOARD_HEIGHT);
+initBoard();
 loop();
 
 onkeydown = function (e) {
