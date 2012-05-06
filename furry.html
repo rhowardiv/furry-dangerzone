@@ -11,7 +11,7 @@
 	.c0 {
 		background-color: black;
 	}
-/* non-player blocks, inactive player block, active player block */
+/* non-player blocks */
 	.c1 {
 		background-color: #933;
 	}
@@ -38,8 +38,8 @@ var BOARD_WIDTH = 8,
 	BOARD_HEIGHT = 17, // allow an extra top row for rotation
 	NUM_COLORS = 3,
 	NUM_TO_MATCH = 4, // pieces in a row required for "match"
-	DROP_INTERVAL = 900, // ms it takes an active piece to move down one space
-	DROP_INTERVAL_CASCADE = 900, // ms it takes a "cascading" piece to move down one space
+	DROP_INTERVAL = 800, // ms it takes an active piece to move down one space
+	DROP_INTERVAL_CASCADE = 500, // ms it takes a "cascading" piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
 	NEW_PIECE = [// new pieces start middle of second row from top
 		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2) - 1,
@@ -148,11 +148,8 @@ function cascade(n) {
 	}
 
 	if (!canCascade(n)) {
-		console.log(n + " : " + board[n]);
 		return [];
 	}
-
-	console.log(n + " can cascade!");
 
 	return [n].concat(cascade(look.up(n)));
 }
@@ -271,6 +268,16 @@ function nppsUnique(npps) {
 	return n;
 }
 
+function nppsSearch(n, npps) {
+	var i;
+	for (i = 0; i < npps.length; i++) {
+		if (npps[i].blocks[0] === n) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 function loop() {
 	var now = new Date * 1,
 		i, j,
@@ -289,12 +296,15 @@ function loop() {
 		for (i = 0; i < npps.length; i++) {
 			if (npps[i].pending_drop <= now) {
 				npps[i].move("down");
-				if (npps[i].checkMove("down")) {
+				if (
+					npps[i].checkMove("down")
+					|| nppsSearch(look.down(npps[i].blocks[0]), next_npps) > -1
+				) {
 					npps[i].pending_drop = now + DROP_INTERVAL_CASCADE;
 					next_npps.push(npps[i]);
 				} else {
 					console.log("ndm for " + npps[i].blocks[0]);
-					console.log(board[look.down(npps[i].blocks[0])]);
+					console.log(board);
 					//todo: check for matches!
 				}
 			} else {
