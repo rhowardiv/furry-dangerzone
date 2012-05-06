@@ -353,8 +353,6 @@ function loop() {
 			piece = false;
 
 			if (matches.length > 0) for (i = 0; i < matches.length; i++) {
-				// just throwing the numbers on the array;
-				// we'll convert them to npp objects as needed
 				cascade(look.up(matches[i])).forEach(function (npp) {
 					var new_npp = newNpp(npp);
 					new_npp.pending_drop = now + DROP_INTERVAL;
