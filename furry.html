@@ -255,41 +255,30 @@ function isPlayerBlock(p) {
 }
 
 function canCascade(p, npps, from_conn) {
+	from_conn = from_conn || 0;
+
+	var below = go.down(p),
+		below_is_empty = board[below] === 0,
+		below_is_attached = from_conn === CONNECT_BOTTOM,
+		further_connections = (board[p] & (CONNECTIONS ^ from_conn)),
+		conn_check,
+		conn_cascades = [],
+		i
+	;
+
 	if (board[p] <= NUM_COLORS) {
 		// Only player blocks can cascade.
 		return [];
 	}
 
-	from_conn = from_conn || 0;
-	var below = go.down(p),
-		conn_check,
-		conn_cascades = []
-		i
-	;
-
-	if (0 === (board[p] & (CONNECTIONS ^ from_conn))) {
-		// I have no unexplored connections
-		if (
-			board[below] === 0
-			|| nppsSearch(below, npps) > -1
-		) {
-			// The block below me is empty or is cascading
-			if (nppsSearch(below, npps) > -1) {
-				console.log("below " + p + " is cascading!");
-				console.log(npps);
-			}
-			return [p];
-		} else {
-			return [];
-		}
-	}
-
-	// The block below is not empty or cascading
-	if (board[below] !== 0 && nppsSearch(below, npps) === -1) {
+	if (!below_is_empty && !below_is_attached && nppsSearch(below, npps) === -1) {
+		// Block below is neither empty, attached to me nor cascading
 		return [];
 	}
 
-	console.log("checking connections from " + p + "(" + board[p] + ")...");
+	if (further_connections === 0) {
+		return [p];
+	}
 
 	// loop over all possible connections
 	for (i = CONNECT_TOP; i & CONNECTIONS; i = i << 1) {
@@ -297,7 +286,6 @@ function canCascade(p, npps, from_conn) {
 			// we came from this direction, or not connected
 			continue;
 		}
-		console.log("looking at " + i);
 		conn_check = canCascade(go_connect[i](p), npps, opposite_connection[i]);
 		if (conn_check.length === 0) {
 			// All connected blocks must be cascadable
@@ -475,19 +463,9 @@ function playerLoop() {
 
 			matches = matchScan();
 
-			// todo: new state and loop for animating match removal
 			if (matches.length > 0) {
-				for (i = 0; i < matches.length; i++) {
-					if (board[matches[i]] & CONNECTIONS) {
-						removeConnectionComplement(matches[i]);
-					}
-					
-					board[matches[i]] = 0;
-				}
-				npps = cascadeScan();
-				if (npps.length > 0) {
-					return next(cascadeLoop, [npps], DROP_INTERVAL_CASCADE);
-				}
+				// todo: no interval after match state implemented
+				return next(matchLoop, [matches], SETTLE_INTERVAL);
 			}
 			return next(playerLoop);
 		}
@@ -521,41 +499,54 @@ function cascadeLoop(npps) {
 
 	var now = new Date * 1,
 		i,
-		matches
+		matches,
+		npp_length,
+		new_npps
 	;
 
 	// we must move the lowest npps first
-	// debatable at this point
-	//npps = nppsUnique(npps);
 	npps.sort(nppSort);
 
 	for (i = 0; i < npps.length; i++) {
 		npps[i].move("down");
 	}
 
+	npp_length = npps.length;
+	new_npps = cascadeScan();
+
+	if (new_npps.length < npps.length) {
+		matches = matchScan();
+		if (matches.length > 0) {
+			// todo: no interval after match state implemented
+			return next(matchLoop, [matches], SETTLE_INTERVAL);
+		}
+	}
+
+	if (new_npps.length > 0) {
+		return next(cascadeLoop, [new_npps], DROP_INTERVAL_CASCADE);
+	} else {
+		return next(playerLoop);
+	}
+}
+
+// todo: match state
+function matchLoop(matches) {
+	var npps = [];
+
+	for (i = 0; i < matches.length; i++) {
+		if (board[matches[i]] & CONNECTIONS) {
+			removeConnectionComplement(matches[i]);
+		}
+		
+		board[matches[i]] = 0;
+	}
+
 	npps = cascadeScan();
 	if (npps.length > 0) {
 		return next(cascadeLoop, [npps], DROP_INTERVAL_CASCADE);
+	} else {
+		return next(playerLoop);
 	}
-
-	matches = matchScan();
-
-	// todo: new state and loop for animating match removal
-	if (matches.length > 0) {
-		for (i = 0; i < matches.length; i++) {
-			if (board[matches[i]] & CONNECTIONS) {
-				removeConnectionComplement(matches[i]);
-			}
-			
-			board[matches[i]] = 0;
-		}
-		npps = cascadeScan();
-		if (npps.length > 0) {
-			return next(cascadeLoop, [npps], DROP_INTERVAL_CASCADE);
-		}
-	}
-
-	return next(playerLoop);
 }
 
 function next(fn, args, interval) {
