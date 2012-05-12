@@ -59,6 +59,13 @@
 		border-bottom-right-radius: 50%;
 	}
 
+/* matches */
+	.c7 {
+		background-color: black;
+		border: 3px solid white;
+		border-radius: 50%;
+	}
+
 </style>
 <div id="board"></div>
 <script>
@@ -71,6 +78,7 @@ var
 	DROP_INTERVAL = 800, // ms it takes an active piece to move down one space
 	DROP_INTERVAL_CASCADE = 500, // ms it takes a "cascading" piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
+	MATCH_PAUSE = 500, // ms to pause when highlighting match
 
 	// Game start parameters
 
@@ -125,7 +133,6 @@ var
 	]),
 
 	// How to rotate a player piece in all orientations.
-	// function composition would be nice here
 	rotation = [
 		[
 			function (p) { return p; },
@@ -207,6 +214,7 @@ var
 	//  0 empty
 	//  1 - n "enemy" blocks placed at start
 	//  n+1 - 2n unbound blocks
+	// 2n+1 matched blocks
 	//  ... Unbound block states can have the bits 2^8-11 flipped on to
 	// indicate bindings to the top, right, bottom and left, respectively.
 	board = [],
@@ -464,8 +472,7 @@ function playerLoop() {
 			matches = matchScan();
 
 			if (matches.length > 0) {
-				// todo: no interval after match state implemented
-				return next(matchLoop, [matches], SETTLE_INTERVAL);
+				return next(setMatches, [matches], SETTLE_INTERVAL);
 			}
 			return next(playerLoop);
 		}
@@ -517,8 +524,7 @@ function cascadeLoop(npps) {
 	if (new_npps.length < npps.length) {
 		matches = matchScan();
 		if (matches.length > 0) {
-			// todo: no interval after match state implemented
-			return next(matchLoop, [matches], SETTLE_INTERVAL);
+			return next(setMatches, [matches], SETTLE_INTERVAL);
 		}
 	}
 
@@ -529,15 +535,25 @@ function cascadeLoop(npps) {
 	}
 }
 
-// todo: match state
-function matchLoop(matches) {
-	var npps = [];
-
+function setMatches(matches) {
+	var i;
 	for (i = 0; i < matches.length; i++) {
 		if (board[matches[i]] & CONNECTIONS) {
 			removeConnectionComplement(matches[i]);
 		}
-		
+
+		board[matches[i]] = 2 * NUM_COLORS + 1;
+	}
+	next(clearMatches, [matches], MATCH_PAUSE);
+
+}
+
+function clearMatches(matches) {
+	var i,
+		npps = []
+	;
+
+	for (i = 0; i < matches.length; i++) {
 		board[matches[i]] = 0;
 	}
 
