@@ -353,6 +353,20 @@ function gameOver() {
 	console.log("GAME OVER!");
 }
 
+function isWin() {
+	var p;
+	for (p = 0; p < board.length; p++) {
+		if (board[p] > 0 && board[p] <= NUM_COLORS) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function win() {
+	console.log("YOU WIN!");
+}
+
 // todo: special case here and in move() for rotation in right edge column
 function checkMove(direction) {
 	var g;
@@ -555,6 +569,10 @@ function clearMatches(matches) {
 
 	for (i = 0; i < matches.length; i++) {
 		board[matches[i]] = 0;
+	}
+
+	if (isWin()) {
+		return next(win);
 	}
 
 	npps = cascadeScan();
