@@ -5,7 +5,8 @@
 		margin: 0 auto;
 		background: black;
 	}
-	div {
+	#board div {
+		position: absolute;
 		text-align: center;
 	}
 	.c0 {
@@ -21,7 +22,7 @@
 	.c3 {
 		background-color: #339;
 	}
-/* unconnected blocks */
+/* player blocks */
 	.c4 {
 		background-color: #c66;
 		border-radius: 50%;
@@ -70,15 +71,16 @@
 <div id="board"></div>
 <script>
 var
-	// basic game parameters
+	// Basic game parameters
 	BOARD_WIDTH = 8,
 	BOARD_HEIGHT = 17, // allow an extra top row for rotation
-	NUM_COLORS = 3, // max 127! See comments on var board
-	NUM_TO_MATCH = 4, // pieces in a row required for "match"
-	DROP_INTERVAL = 800, // ms it takes an active piece to move down one space
-	DROP_INTERVAL_CASCADE = 500, // ms it takes a "cascading" piece to move down one space
+	NUM_COLORS = 3,
+	NUM_TO_MATCH = 4, // pieces in a row required for match
+	DROP_INTERVAL = 600, // ms it takes an active piece to move down one space
+	DROP_INTERVAL_CASCADE = 600, // ms it takes a "cascading" piece to move down one space
 	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
-	MATCH_PAUSE = 500, // ms to pause when highlighting match
+	MATCH_PAUSE = 600, // ms to pause when highlighting match
+	DEFAULT_LOOP_DELAY = 20,
 
 	// Game start parameters
 
@@ -89,29 +91,57 @@ var
 	// Max consecutive instances of any one color to start
 	START_MAX_IN_A_ROW = 2,
 
-	// bits that indicate connections
+	// Bits that indicate connections
 	CONNECT_TOP = 0x0100,
 	CONNECT_RIGHT = 0x0200,
 	CONNECT_BOTTOM = 0x0400,
 	CONNECT_LEFT = 0x0800,
 	CONNECTIONS = CONNECT_TOP | CONNECT_RIGHT | CONNECT_BOTTOM | CONNECT_LEFT,
 
+	MATCH_PENDING = NUM_COLORS * 2 + 1,
+
 	// New piece template
 	NEW_PIECE = [
 		// [ position, connect state[, ...] ]
-		// (color will be added at generation)
+		// (random color is added at generation)
 		// These positions represent the middle of the second row from top.
-		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2) - 1, CONNECT_RIGHT,
-		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2), CONNECT_LEFT
+		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2) - 1,
+		CONNECT_RIGHT,
+		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2),
+		CONNECT_LEFT
 	],
-	// how to traverse the board
+	// How to traverse the board
 	go = {
-		up: function (p) { return (BOARD_HEIGHT - Math.floor(p / BOARD_WIDTH) - 1) ? (p + BOARD_WIDTH) : -1; },
-		right: function (p) { return (BOARD_WIDTH - (p % BOARD_WIDTH) - 1) ? (p + 1) : -1; },
-		down: function (p) { return Math.floor(p / BOARD_WIDTH) ? (p - BOARD_WIDTH) : -1; },
-		left: function (p) { return (p % BOARD_WIDTH) ? (p - 1) : -1; }
+		up: function (p) {
+			return (BOARD_HEIGHT - Math.floor(p / BOARD_WIDTH) - 1)
+			? (p + BOARD_WIDTH)
+			: -1;
+		},
+		right: function (p) {
+			return (BOARD_WIDTH - (p % BOARD_WIDTH) - 1)
+			? (p + 1)
+			: -1;
+		},
+		down: function (p) {
+			return Math.floor(p / BOARD_WIDTH)
+			? (p - BOARD_WIDTH)
+			: -1;
+		},
+		left: function (p) {
+			return (p % BOARD_WIDTH)
+			? (p - 1)
+			: -1;
+		}
 	},
-	// sugar for object "literals" with expressions as keys
+	// Direction constants
+	up = "up",
+	right = "right",
+	down = "down",
+	left = "left",
+	rotate = "rotate",
+
+	// Turn an array [key, value[,...]] into a hash
+	// Sugar for declaring objects with expressions as keys
 	makeHash = function(array) {
 		var i, hash = {};
 		for (i = 0; i < array.length; i += 2) {
@@ -132,7 +162,7 @@ var
 		CONNECT_LEFT, CONNECT_RIGHT
 	]),
 
-	// How to rotate a player piece in all orientations.
+	// Translation table for making a piece rotate
 	rotation = [
 		[
 			function (p) { return p; },
@@ -148,7 +178,7 @@ var
 			function (p) { return go.right(p); }
 		]
 	],
-	// How to maintain state(connections) when rotating
+	// How to maintain connections when rotating
 	rotation_state = [
 		[
 			function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_TOP; },
@@ -187,7 +217,6 @@ var
 				for (j = 0; j < w; j++) {
 					e = document.createElement("div");
 					e.className = "c0";
-					e.style.position = "absolute";
 					e.style.bottom = i * block_size + "px";
 					e.style.left = j * block_size + "px";
 					e.style.width = block_size + "px";
@@ -213,33 +242,34 @@ var
 	// -1 invalid (not on board)
 	//  0 empty
 	//  1 - n "enemy" blocks placed at start
-	//  n+1 - 2n unbound blocks
+	//  n+1 - 2n player blocks
 	// 2n+1 matched blocks
-	//  ... Unbound block states can have the bits 2^8-11 flipped on to
+	//  ... Player block states can have the bits 2^8-11 flipped on to
 	// indicate bindings to the top, right, bottom and left, respectively.
+	// Note that since connections bits start at 256, max NUM_COLORS is 127.
 	board = [],
 
-	// controllable piece, if one exists
+	// The controllable piece, if one exists
 	piece
 ;
 
-function match(p, direction) {
-	var g;
+function colorOf(p) {
+	return (board[p] & ~CONNECTIONS) % NUM_COLORS;
+}
 
+function match(direction, p) {
 	if (board[p] === 0) {
 		return [];
 	}
 
-	g = go[direction](p);
-	if (
-		g === -1
-		|| (board[p] & ~CONNECTIONS) % NUM_COLORS !== (board[g] & ~CONNECTIONS) % NUM_COLORS
-	) {
+	var g = go[direction](p);
+
+	if (g === -1 || colorOf(p) !== colorOf(g)) {
 		return [p];
 	}
 
 	// g matches so keep looking that way
-	return [p].concat(match(g, direction));
+	return [p].concat(match(direction, g));
 }
 
 function matchScan() {
@@ -248,8 +278,8 @@ function matchScan() {
 		matches = []
 	;
 	for (p = 0; p < board.length; p++) {
-		["up", "right"].forEach(function (dir) {
-			check_match = match(p, dir);
+		[up, right].forEach(function (dir) {
+			check_match = match(dir, p);
 			if (check_match.length >= NUM_TO_MATCH) {
 				matches = matches.concat(check_match);
 			}
@@ -338,8 +368,8 @@ function initBoard() {
 
 		if (p + 1 < (BOARD_HEIGHT * BOARD_WIDTH)) {
 			if (
-				match(p, 'left').length <= START_MAX_IN_A_ROW
-				&& match(p, 'down').length <= START_MAX_IN_A_ROW
+				match(left, p).length <= START_MAX_IN_A_ROW
+				&& match(down, p).length <= START_MAX_IN_A_ROW
 			) {
 				fill(++p, true);
 			} else {
@@ -371,7 +401,7 @@ function win() {
 function checkMove(direction) {
 	var g;
 	for (i = 0; i < this.blocks.length; i++) {
-		g = direction === "rotate"
+		g = direction === rotate
 			? rotation[this.orientation][i](this.blocks[i])
 			: go[direction](this.blocks[i])
 		;
@@ -389,7 +419,7 @@ function checkMove(direction) {
 function move(direction) {
 	var i,
 		copy = [],
-		is_rotation = direction === "rotate"
+		is_rotation = direction === rotate
 	;
 	for (i = 0; i < this.blocks.length; i++) {
 		copy[i] = board[this.blocks[i]];
@@ -417,7 +447,14 @@ function newPiece(now) {
 			// GAME OVER
 			return;
 		}
-		board[NEW_PIECE[i]] = Math.floor(Math.random() * (NUM_COLORS) + NUM_COLORS + 1 + NEW_PIECE[i + 1]);
+		board[NEW_PIECE[i]] = Math.floor(
+			// a random color
+			Math.random() * (NUM_COLORS)
+			// set state for player piece
+			+ NUM_COLORS + 1
+			// set connection
+			+ NEW_PIECE[i + 1]
+		);
 		blocks.push(NEW_PIECE[i]);
 	}
 
@@ -439,10 +476,6 @@ function newNpp(p) {
 		move: move,
 		checkMove: checkMove
 	};
-}
-
-function nppSort(npp1, npp2) {
-	return npp1.blocks[0] - npp2.blocks[0]; 
 }
 
 function nppsSearch(p, npps) {
@@ -486,25 +519,28 @@ function playerLoop() {
 			matches = matchScan();
 
 			if (matches.length > 0) {
-				return next(setMatches, [matches], SETTLE_INTERVAL);
+				next(setMatches, [matches], SETTLE_INTERVAL);
+				return;
 			}
-			return next(playerLoop);
+			next(playerLoop);
+			return;
 		}
-	} else if (!piece.checkMove("down")) {
+	} else if (!piece.checkMove(down)) {
 		piece.pending_settle = now + SETTLE_INTERVAL;
 		piece.pending_drop = 0;
 	} else if (piece.pending_drop && piece.pending_drop <= now) {
-		piece.move('down');
+		piece.move(down);
 		piece.pending_drop = now + DROP_INTERVAL;
 	}
 
 	m = piece.pending_moves.pop();
 	if (m && piece.checkMove(m)) {
 		piece.move(m);
-		if (m === "down" && piece.checkMove("down")) {
+		if (m === down && piece.checkMove(down)) {
+			// Reset drop timer when piece is moved down
 			piece.pending_drop = now + DROP_INTERVAL;
 		} else {
-			if (piece.pending_settle && piece.checkMove("down")) {
+			if (piece.pending_settle && piece.checkMove(down)) {
 				// Unset the settle timer and re-set drop timer if the move has
 				// resulted in more possible down moves.
 				piece.pending_settle = 0;
@@ -516,37 +552,37 @@ function playerLoop() {
 	next(playerLoop);
 }
 
-function cascadeLoop(npps) {
+function nppSort(npp1, npp2) {
+	return npp1.blocks[0] - npp2.blocks[0]; 
+}
 
-	var now = new Date * 1,
-		i,
+function cascadeLoop(npps) {
+	var i,
 		matches,
-		npp_length,
 		new_npps
 	;
 
-	// we must move the lowest npps first
+	// Move the lowest npps first
 	npps.sort(nppSort);
 
 	for (i = 0; i < npps.length; i++) {
-		npps[i].move("down");
+		npps[i].move(down);
 	}
 
-	npp_length = npps.length;
 	new_npps = cascadeScan();
 
 	if (new_npps.length < npps.length) {
 		matches = matchScan();
 		if (matches.length > 0) {
-			return next(setMatches, [matches], SETTLE_INTERVAL);
+			next(setMatches, [matches], SETTLE_INTERVAL);
+			return;
 		}
 	}
 
-	if (new_npps.length > 0) {
-		return next(cascadeLoop, [new_npps], DROP_INTERVAL_CASCADE);
-	} else {
-		return next(playerLoop);
-	}
+	next.apply(null, (new_npps.length > 0)
+		? [cascadeLoop, [new_npps], DROP_INTERVAL_CASCADE]
+		: [playerLoop]
+	);
 }
 
 function setMatches(matches) {
@@ -556,7 +592,7 @@ function setMatches(matches) {
 			removeConnectionComplement(matches[i]);
 		}
 
-		board[matches[i]] = 2 * NUM_COLORS + 1;
+		board[matches[i]] = MATCH_PENDING;
 	}
 	next(clearMatches, [matches], MATCH_PAUSE);
 
@@ -576,11 +612,10 @@ function clearMatches(matches) {
 	}
 
 	npps = cascadeScan();
-	if (npps.length > 0) {
-		return next(cascadeLoop, [npps], DROP_INTERVAL_CASCADE);
-	} else {
-		return next(playerLoop);
-	}
+	next.apply(null, (npps.length > 0)
+		? [cascadeLoop, [npps], DROP_INTERVAL_CASCADE]
+		: [playerLoop]
+	);
 }
 
 function next(fn, args, interval) {
@@ -589,7 +624,7 @@ function next(fn, args, interval) {
 		function () {
 			fn.apply(null, args);
 		},
-		interval || 20
+		interval || DEFAULT_LOOP_DELAY
 	);
 }
 
@@ -603,15 +638,15 @@ onkeydown = function (e) {
 	switch (e.keyCode) {
 		case 37: // left arrow
 		case 65: // "a"
-			piece && piece.pending_moves.unshift("left");
+			piece && piece.pending_moves.unshift(left);
 			return false;
 		case 39: // right arrow
 		case 68: // "d"
-			piece && piece.pending_moves.unshift("right");
+			piece && piece.pending_moves.unshift(right);
 			return false;
 		case 40: // down arrow
 		case 83: // "s"
-			piece && piece.pending_moves.unshift("down");
+			piece && piece.pending_moves.unshift(down);
 			return false;
 		case 38: // up arrow
 		case 87: // "w"
@@ -621,7 +656,7 @@ onkeydown = function (e) {
 		case 17: // ctrl
 		case 13: // enter
 		case 16: // shift
-			piece && piece.pending_moves.unshift("rotate");
+			piece && piece.pending_moves.unshift(rotate);
 			return false;
 		case 27: // ESC
 			// debug -- STOP!!
