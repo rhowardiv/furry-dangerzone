@@ -118,35 +118,97 @@ var
 		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2),
 		CONNECT_LEFT
 	],
+	// create a function that accepts values or arrays
+	mappable = function (fn) {
+		return function (arg) {
+			return Array.isArray(arg) ? arg.map(fn) : fn(arg);
+		}
+	},
+	id = function (x) {
+		return x;
+	},
 	// How to traverse the board
 	go = {
-		up: function (p) {
+		up: mappable(function (p) {
 			return (BOARD_HEIGHT - Math.floor(p / BOARD_WIDTH) - 1)
 			? (p + BOARD_WIDTH)
 			: -1;
-		},
-		right: function (p) {
+		}),
+		right: mappable(function (p) {
 			return (BOARD_WIDTH - (p % BOARD_WIDTH) - 1)
 			? (p + 1)
 			: -1;
-		},
-		down: function (p) {
+		}),
+		down: mappable(function (p) {
 			return Math.floor(p / BOARD_WIDTH)
 			? (p - BOARD_WIDTH)
 			: -1;
-		},
-		left: function (p) {
+		}),
+		left: mappable(function (p) {
 			return (p % BOARD_WIDTH)
 			? (p - 1)
 			: -1;
-		}
+		}),
+		rotate_left: [
+			function (ps) {
+				return [
+					ps[0],
+					go.up(go.left(ps[1]))
+				];
+			},
+			function (ps) {
+				return [
+					go.right(ps[0]),
+					go.down(ps[1])
+				];
+			},
+			function (ps) {
+				return [
+					go.up(go.left(ps[0])),
+					ps[1]
+				];
+			},
+			function (ps) {
+				return [
+					go.down(ps[0]),
+					go.right(ps[1])
+				];
+			}
+		],
+		rotate_right: [
+			function (ps) {
+				return [
+					go.up(go.right(ps[0])),
+					ps[1]
+				];
+			},
+			function (ps) {
+				return [
+					go.down(ps[0]),
+					go.left(ps[1])
+				];
+			},
+			function (ps) {
+				return [
+					ps[0],
+					go.up(go.right(ps[1]))
+				];
+			},
+			function (ps) {
+				return [
+					go.left(ps[0]),
+					go.down(ps[1])
+				];
+			}
+		]
 	},
 	// Direction constants
 	up = "up",
 	right = "right",
 	down = "down",
 	left = "left",
-	rotate = "rotate",
+	rotate_left = "rotate_left",
+	rotate_right = "rotate_right",
 
 	// Turn an array [key, value[,...]] into a hash
 	// Sugar for declaring objects with expressions as keys
@@ -170,38 +232,49 @@ var
 		CONNECT_LEFT, CONNECT_RIGHT
 	]),
 
-	// Translation table for making a piece rotate
-	rotation = [
-		[
-			function (p) { return p; },
-			function (p) { return go.up(go.left(p)); }
-		], [
-			function (p) { return go.right(p); },
-			function (p) { return go.down(p); }
-		], [
-			function (p) { return go.up(go.left(p)); },
-			function (p) { return p; }
-		], [
-			function (p) { return go.down(p); },
-			function (p) { return go.right(p); }
-		]
-	],
 	// How to maintain connections when rotating
-	rotation_state = [
-		[
-			function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_TOP; },
-			function (s) { return (s ^ CONNECT_LEFT) | CONNECT_BOTTOM; }
-		], [
-			function (s) { return (s ^ CONNECT_TOP) | CONNECT_LEFT; },
-			function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_RIGHT; }
-		], [
-			function (s) { return (s ^ CONNECT_LEFT) | CONNECT_BOTTOM; },
-			function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_TOP; }
-		], [
-			function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_RIGHT; },
-			function (s) { return (s ^ CONNECT_TOP) | CONNECT_LEFT; }
+	rotation_state = {
+		up: mappable(id),
+		right: mappable(id),
+		down: mappable(id),
+		left: mappable(id),
+		rotate_left: [
+				function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_TOP; },
+				function (s) { return (s ^ CONNECT_LEFT) | CONNECT_BOTTOM; }
+			], [
+				function (s) { return (s ^ CONNECT_TOP) | CONNECT_LEFT; },
+				function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_RIGHT; }
+			], [
+				function (s) { return (s ^ CONNECT_LEFT) | CONNECT_BOTTOM; },
+				function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_TOP; }
+			], [
+				function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_RIGHT; },
+				function (s) { return (s ^ CONNECT_TOP) | CONNECT_LEFT; }
+			]
+		],
+		rotate_right: [
+				function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_BOTTOM; },
+				function (s) { return (s ^ CONNECT_LEFT) | CONNECT_TOP; }
+			], [
+				function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_LEFT; },
+				function (s) { return (s ^ CONNECT_TOP) | CONNECT_RIGHT; }
+			], [
+				function (s) { return (s ^ CONNECT_LEFT) | CONNECT_TOP; },
+				function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_BOTTOM; }
+			], [
+				function (s) { return (s ^ CONNECT_TOP) | CONNECT_RIGHT; },
+				function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_LEFT; }
+			]
 		]
-	],
+	},
+	rotation_orient = {
+		rotate_left: function (o) {
+			return (o + 1) % 4;
+		},
+		rotate_right: function (o) {
+			return (o + 3) % 4;
+		}
+	}
 	renderer = {
 		board_dom: null,
 		init: function () {
@@ -405,18 +478,17 @@ function win() {
 	console.log("YOU WIN!");
 }
 
-// todo: special case here and in move() for rotation in right edge column
+// todo: figure out how to deal with rotation alternatives
 function checkMove(direction) {
-	var g;
-	for (i = 0; i < this.blocks.length; i++) {
-		g = direction === rotate
-			? rotation[this.orientation][i](this.blocks[i])
-			: go[direction](this.blocks[i])
-		;
-
+	var i,
+		translated = Array.isArray(go[direction])
+			? go[direction][this.orientation](this.blocks)
+			: go[direction](this.blocks)
+	;
+	for (i = 0; i < translated.length; i++) {
 		if (
-			0 !== board[g]
-			&& this.blocks.indexOf(g) === -1
+			0 !== board[translated[i]]
+			&& this.blocks.indexOf(translated[i]) === -1
 		) {
 			return false;
 		}
@@ -427,16 +499,16 @@ function checkMove(direction) {
 function move(direction) {
 	var i,
 		copy = [],
-		is_rotation = direction === rotate
+		is_rotation = Array.isArray(go[direction])
 	;
 	for (i = 0; i < this.blocks.length; i++) {
 		copy[i] = board[this.blocks[i]];
 		board[this.blocks[i]] = 0;
-		this.blocks[i] = is_rotation
-			? rotation[this.orientation][i](this.blocks[i])
-			: go[direction](this.blocks[i])
-		;
 	}
+	this.blocks = is_rotation
+		? go[direction][this.orientation](this.blocks)
+		: go[direction](this.blocks)
+
 	for (i = 0; i < copy.length; i++) {
 		if (is_rotation) {
 			copy[i] = rotation_state[this.orientation][i](copy[i]);
