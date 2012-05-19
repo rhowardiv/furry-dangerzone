@@ -400,10 +400,6 @@ function matchScan() {
 	return matches;
 }
 
-function isPlayerBlock(p) {
-	return board[p] > NUM_COLORS;
-}
-
 function canCascade(p, npps, from_conn) {
 	from_conn = from_conn || 0;
 
