@@ -118,7 +118,8 @@ var
 		(BOARD_HEIGHT - 2) * BOARD_WIDTH + Math.floor(BOARD_WIDTH / 2),
 		CONNECT_LEFT
 	],
-	// create a function that accepts values or arrays
+
+	// create a function that accepts a value or array
 	mappable = function (fn) {
 		return function (arg) {
 			return Array.isArray(arg) ? arg.map(fn) : fn(arg);
@@ -127,7 +128,8 @@ var
 	id = function (x) {
 		return x;
 	},
-	// How to traverse the board
+
+	// How to move around
 	go = {
 		up: mappable(function (p) {
 			return (BOARD_HEIGHT - Math.floor(p / BOARD_WIDTH) - 1)
@@ -149,58 +151,62 @@ var
 			? (p - 1)
 			: -1;
 		}),
-		rotate_left: [
-			function (ps) {
-				return [
-					ps[0],
-					go.up(go.left(ps[1]))
-				];
-			},
-			function (ps) {
-				return [
-					go.right(ps[0]),
-					go.down(ps[1])
-				];
-			},
-			function (ps) {
-				return [
-					go.up(go.left(ps[0])),
-					ps[1]
-				];
-			},
-			function (ps) {
-				return [
-					go.down(ps[0]),
-					go.right(ps[1])
-				];
-			}
-		],
-		rotate_right: [
-			function (ps) {
-				return [
-					go.up(go.right(ps[0])),
-					ps[1]
-				];
-			},
-			function (ps) {
-				return [
-					go.down(ps[0]),
-					go.left(ps[1])
-				];
-			},
-			function (ps) {
-				return [
-					ps[0],
-					go.up(go.right(ps[1]))
-				];
-			},
-			function (ps) {
-				return [
-					go.left(ps[0]),
-					go.down(ps[1])
-				];
-			}
-		]
+		rotate_left: function (ps, o) {
+			return [
+				function (ps) {
+					return [
+						ps[0],
+						go.up(go.left(ps[1]))
+					];
+				},
+				function (ps) {
+					return [
+						go.right(ps[0]),
+						go.down(ps[1])
+					];
+				},
+				function (ps) {
+					return [
+						go.up(go.left(ps[0])),
+						ps[1]
+					];
+				},
+				function (ps) {
+					return [
+						go.down(ps[0]),
+						go.right(ps[1])
+					];
+				}
+			][o](ps);
+		},
+		rotate_right: function (ps, o) {
+			return [
+				function (ps) {
+					return [
+						go.up(go.right(ps[0])),
+						ps[1]
+					];
+				},
+				function (ps) {
+					return [
+						go.left(ps[0]),
+						go.down(ps[1])
+					];
+				},
+				function (ps) {
+					return [
+						ps[0],
+						go.up(go.right(ps[1]))
+					];
+				},
+				function (ps) {
+					return [
+						go.down(ps[0]),
+						go.left(ps[1])
+					];
+				}
+			][o](ps);
+		}
 	},
 	// Direction constants
 	up = "up",
@@ -232,49 +238,66 @@ var
 		CONNECT_LEFT, CONNECT_RIGHT
 	]),
 
-	// How to maintain connections when rotating
+	// How to maintain connections (state) when moving
 	rotation_state = {
 		up: mappable(id),
 		right: mappable(id),
 		down: mappable(id),
 		left: mappable(id),
-		rotate_left: [
-				function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_TOP; },
-				function (s) { return (s ^ CONNECT_LEFT) | CONNECT_BOTTOM; }
-			], [
-				function (s) { return (s ^ CONNECT_TOP) | CONNECT_LEFT; },
-				function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_RIGHT; }
-			], [
-				function (s) { return (s ^ CONNECT_LEFT) | CONNECT_BOTTOM; },
-				function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_TOP; }
-			], [
-				function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_RIGHT; },
-				function (s) { return (s ^ CONNECT_TOP) | CONNECT_LEFT; }
-			]
-		],
-		rotate_right: [
-				function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_BOTTOM; },
-				function (s) { return (s ^ CONNECT_LEFT) | CONNECT_TOP; }
-			], [
-				function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_LEFT; },
-				function (s) { return (s ^ CONNECT_TOP) | CONNECT_RIGHT; }
-			], [
-				function (s) { return (s ^ CONNECT_LEFT) | CONNECT_TOP; },
-				function (s) { return (s ^ CONNECT_RIGHT) | CONNECT_BOTTOM; }
-			], [
-				function (s) { return (s ^ CONNECT_TOP) | CONNECT_RIGHT; },
-				function (s) { return (s ^ CONNECT_BOTTOM) | CONNECT_LEFT; }
-			]
-		]
+		rotate_left: function (ss, o) {
+			return [
+				function (ss) { return [
+					(ss[0] ^ CONNECT_RIGHT) | CONNECT_TOP,
+					(ss[1] ^ CONNECT_LEFT) | CONNECT_BOTTOM
+				]; },
+				function (ss) { return [
+					(ss[0] ^ CONNECT_TOP) | CONNECT_LEFT,
+					(ss[1] ^ CONNECT_BOTTOM) | CONNECT_RIGHT
+				]; },
+				function (ss) { return [
+					(ss[0] ^ CONNECT_LEFT) | CONNECT_BOTTOM,
+					(ss[1] ^ CONNECT_RIGHT) | CONNECT_TOP
+				]; },
+				function (ss) { return [
+					(ss[0] ^ CONNECT_BOTTOM) | CONNECT_RIGHT,
+					(ss[1] ^ CONNECT_TOP) | CONNECT_LEFT
+				]; }
+			][o](ss);
+		},
+		rotate_right: function (ss, o) {
+			return [
+				function (ss) { return [
+					(ss[0] ^ CONNECT_RIGHT) | CONNECT_BOTTOM,
+					(ss[1] ^ CONNECT_LEFT) | CONNECT_TOP
+				]; },
+				function (ss) { return [
+					(ss[0] ^ CONNECT_TOP) | CONNECT_RIGHT,
+					(ss[1] ^ CONNECT_BOTTOM) | CONNECT_LEFT
+				]; },
+				function (ss) { return [
+					(ss[0] ^ CONNECT_LEFT) | CONNECT_TOP,
+					(ss[1] ^ CONNECT_RIGHT) | CONNECT_BOTTOM
+				]; },
+				function (ss) { return [
+					(ss[0] ^ CONNECT_BOTTOM) | CONNECT_LEFT,
+					(ss[1] ^ CONNECT_TOP) | CONNECT_RIGHT
+				]; }
+			][o](ss);
+		},
 	},
+	// How orientation changes when moving
 	rotation_orient = {
+		up: id,
+		right: id,
+		down: id,
+		left: id,
 		rotate_left: function (o) {
 			return (o + 1) % 4;
 		},
 		rotate_right: function (o) {
 			return (o + 3) % 4;
 		}
-	}
+	},
 	renderer = {
 		board_dom: null,
 		init: function () {
@@ -339,11 +362,13 @@ function colorOf(p) {
 }
 
 function match(direction, p) {
+	var g;
+
 	if (board[p] === 0) {
 		return [];
 	}
 
-	var g = go[direction](p);
+	g = go[direction](p);
 
 	if (g === -1 || colorOf(p) !== colorOf(g)) {
 		return [p];
@@ -481,14 +506,12 @@ function win() {
 // todo: figure out how to deal with rotation alternatives
 function checkMove(direction) {
 	var i,
-		translated = Array.isArray(go[direction])
-			? go[direction][this.orientation](this.blocks)
-			: go[direction](this.blocks)
+		moved = go[direction](this.blocks, this.orientation)
 	;
-	for (i = 0; i < translated.length; i++) {
+	for (i = 0; i < moved.length; i++) {
 		if (
-			0 !== board[translated[i]]
-			&& this.blocks.indexOf(translated[i]) === -1
+			0 !== board[moved[i]]
+			&& this.blocks.indexOf(moved[i]) === -1
 		) {
 			return false;
 		}
@@ -498,26 +521,19 @@ function checkMove(direction) {
 
 function move(direction) {
 	var i,
-		copy = [],
-		is_rotation = Array.isArray(go[direction])
+		states = []
 	;
 	for (i = 0; i < this.blocks.length; i++) {
-		copy[i] = board[this.blocks[i]];
+		states[i] = board[this.blocks[i]];
 		board[this.blocks[i]] = 0;
 	}
-	this.blocks = is_rotation
-		? go[direction][this.orientation](this.blocks)
-		: go[direction](this.blocks)
+	this.blocks = go[direction](this.blocks, this.orientation);
 
-	for (i = 0; i < copy.length; i++) {
-		if (is_rotation) {
-			copy[i] = rotation_state[this.orientation][i](copy[i]);
-		}
-		board[this.blocks[i]] = copy[i];
+	states = rotation_state[direction](states, this.orientation);
+	for (i = 0; i < states.length; i++) {
+		board[this.blocks[i]] = states[i];
 	}
-	if (is_rotation) {
-		this.orientation = (1 + this.orientation) % 4;
-	}
+	this.orientation = rotation_orient[direction](this.orientation);
 }
 
 function newPiece(now) {
@@ -716,9 +732,15 @@ playerLoop();
 onkeydown = function (e) {
 	var d;
 	switch (e.keyCode) {
-		case 37: // left arrow
-		case 65: // "a"
-			piece && piece.pending_moves.unshift(left);
+		case 188: // ","
+			piece && piece.pending_moves.unshift(rotate_left);
+			return false;
+		case 190: // "."
+			piece && piece.pending_moves.unshift(rotate_right);
+			return false;
+		case 38: // up arrow
+		case 87: // "w"
+			// todo: instaplace
 			return false;
 		case 39: // right arrow
 		case 68: // "d"
@@ -728,21 +750,23 @@ onkeydown = function (e) {
 		case 83: // "s"
 			piece && piece.pending_moves.unshift(down);
 			return false;
-		case 38: // up arrow
-		case 87: // "w"
-			// todo: instaplace
-			return false;
-		case 32: // space
-		case 17: // ctrl
-		case 13: // enter
-		case 16: // shift
-			piece && piece.pending_moves.unshift(rotate);
+		case 37: // left arrow
+		case 65: // "a"
+			piece && piece.pending_moves.unshift(left);
 			return false;
 		case 27: // ESC
 			// debug -- STOP!!
 			renderer.render(board);
 			next = null;
 			return false;
+
+		// currently not using these keys
+		// todo: remove once control scheme gels
+		case 70: // "f"
+		case 32: // space
+		case 17: // ctrl
+		case 13: // enter
+		case 16: // shift
 		default:
 			return true;
 	}
