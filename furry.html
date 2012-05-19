@@ -224,22 +224,20 @@ var
 		rotate_right: rotate_left
 	},
 
-	// Turn an array [key, value[,...]] into a hash
-	// Sugar for declaring objects with expressions as keys
-	makeHash = function(array) {
-		var i, hash = {};
+	keysValues = function(array) {
+		var i, obj = {};
 		for (i = 0; i < array.length; i += 2) {
-			hash[array[i]] = array[i + 1];
+			obj[array[i]] = array[i + 1];
 		}
-		return hash;
+		return obj;
 	},
-	go_connect = makeHash([
+	go_connect = keysValues([
 		CONNECT_TOP, go.up,
 		CONNECT_RIGHT, go.right,
 		CONNECT_BOTTOM, go.down,
 		CONNECT_LEFT, go.left
 	]),
-	opposite_connection = makeHash([
+	opposite_connection = keysValues([
 		CONNECT_TOP, CONNECT_BOTTOM,
 		CONNECT_RIGHT, CONNECT_LEFT,
 		CONNECT_BOTTOM, CONNECT_TOP,
