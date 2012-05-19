@@ -123,7 +123,7 @@ var
 	mappable = function (fn) {
 		return function (arg) {
 			return Array.isArray(arg) ? arg.map(fn) : fn(arg);
-		}
+		};
 	},
 	id = function (x) {
 		return x;
@@ -593,7 +593,7 @@ function removeConnectionComplement(p) {
 }
 
 function playerLoop() {
-	var now = new Date * 1,
+	var now = +new Date,
 		i, j,
 		m,
 		check_match = [],
@@ -676,7 +676,7 @@ function playerMove(m) {
 }
 
 function nppSort(npp1, npp2) {
-	return npp1.blocks[0] - npp2.blocks[0]; 
+	return npp1.blocks[0] - npp2.blocks[0];
 }
 
 function cascadeLoop(npps) {
