@@ -376,7 +376,7 @@ function match(direction, p) {
 
 	g = go[direction](p);
 
-	if (g === -1 || colorOf(p) !== colorOf(g)) {
+	if (g === -1 || colorOf(g) !== colorOf(p)) {
 		return [p];
 	}
 
