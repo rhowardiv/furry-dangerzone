@@ -215,6 +215,14 @@ var
 	left = "left",
 	rotate_left = "rotate_left",
 	rotate_right = "rotate_right",
+	opposite = {
+		up: down,
+		right: left,
+		down: up,
+		left: right,
+		rotate_left: rotate_right,
+		rotate_right: rotate_left
+	},
 
 	// Turn an array [key, value[,...]] into a hash
 	// Sugar for declaring objects with expressions as keys
@@ -503,7 +511,6 @@ function win() {
 	console.log("YOU WIN!");
 }
 
-// todo: figure out how to deal with rotation alternatives
 function checkMove(direction) {
 	var i,
 		moved = go[direction](this.blocks, this.orientation)
@@ -630,8 +637,7 @@ function playerLoop() {
 	}
 
 	m = piece.pending_moves.pop();
-	if (m && piece.checkMove(m)) {
-		piece.move(m);
+	if (m && playerMove(m)) {
 		if (m === down && piece.checkMove(down)) {
 			// Reset drop timer when piece is moved down
 			piece.pending_drop = now + DROP_INTERVAL;
@@ -644,8 +650,35 @@ function playerLoop() {
 			}
 		}
 	}
-
 	next(playerLoop);
+}
+
+function playerMove(m) {
+	if (piece.checkMove(m)) {
+		piece.move(m);
+		return true;
+	}
+
+	if (m !== rotate_left && m !== rotate_right) {
+		return false;
+	}
+
+	piece.blocks.reverse();
+	piece.orientation = (2 + piece.orientation) % 4;
+	m = opposite[m];
+
+	if (!piece.checkMove(m)) {
+
+		piece.blocks.reverse();
+		piece.orientation = (2 + piece.orientation) % 4;
+		m = opposite[m];
+
+		return false;
+	}
+
+	piece.move(m);
+	return true;
+
 }
 
 function nppSort(npp1, npp2) {
