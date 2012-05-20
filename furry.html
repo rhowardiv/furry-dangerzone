@@ -561,6 +561,7 @@ function newPiece(now) {
 		pending_drop: now + DROP_INTERVAL,
 		pending_settle: 0,
 		pending_moves: [],
+		pending_slam: false,
 		move: move,
 		checkMove: checkMove,
 	};
@@ -643,6 +644,11 @@ function playerLoop() {
 				piece.pending_drop = now + DROP_INTERVAL;
 			}
 		}
+	} else if (!m && piece.pending_slam) {
+		while (piece.checkMove(down)) {
+			piece.move(down);
+		}
+		piece.pending_settle = now;
 	}
 	next(playerLoop);
 }
@@ -751,6 +757,12 @@ function next(fn, args, interval) {
 	);
 }
 
+function queueMove(direction) {
+	if (piece && !piece.pending_slam) {
+		piece.pending_moves.unshift(direction);
+	}
+}
+
 renderer.init();
 
 initBoard();
@@ -760,26 +772,28 @@ onkeydown = function (e) {
 	var d;
 	switch (e.keyCode) {
 		case 188: // ","
-			piece && piece.pending_moves.unshift(rotate_left);
+			queueMove(rotate_left);
 			return false;
 		case 190: // "."
-			piece && piece.pending_moves.unshift(rotate_right);
+			queueMove(rotate_right);
 			return false;
 		case 38: // up arrow
 		case 87: // "w"
-			// todo: instaplace
+			if (piece) {
+				piece.pending_slam = true;
+			}
 			return false;
 		case 39: // right arrow
 		case 68: // "d"
-			piece && piece.pending_moves.unshift(right);
+			queueMove(right);
 			return false;
 		case 40: // down arrow
 		case 83: // "s"
-			piece && piece.pending_moves.unshift(down);
+			queueMove(down);
 			return false;
 		case 37: // left arrow
 		case 65: // "a"
-			piece && piece.pending_moves.unshift(left);
+			queueMove(left);
 			return false;
 		case 27: // ESC
 			// debug -- STOP!!
