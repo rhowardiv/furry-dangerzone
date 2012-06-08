@@ -87,14 +87,13 @@ var
 	BOARD_HEIGHT = 17, // allow an extra top row for rotation
 	NUM_COLORS = 3,
 	NUM_TO_MATCH = 4, // pieces in a row required for match
-	DROP_INTERVAL = 600, // ms it takes an active piece to move down one space
-	DROP_INTERVAL_CASCADE = 600, // ms it takes a "cascading" piece to move down one space
-	SETTLE_INTERVAL = 400, // ms it takes a piece to "settle" after landing
-	MATCH_PAUSE = 600, // ms to pause when highlighting match
 	DEFAULT_LOOP_DELAY = 20,
+	TICKS_TO_SPEEDUP = 600, // downward moves plus new pieces * 10; change to time?
+	SPEEDUP_FACTOR = 0.8,
 
 	// Game start parameters
 
+	INTERVAL = 600, // speed; ms for a drop / match highlight
 	START_HEIGHT = 8,
 	// Probabilistic density of pieces on starting board, between 0 (nothing)
 	// and 1 (completely full)
@@ -365,6 +364,19 @@ var
 	// The controllable piece, if one exists
 	piece,
 
+	// countdown to a speedup
+	speedupTick = function () {
+		var ticks = 0;
+		return function (n) {
+			n = n || 1;
+			ticks += n;
+			if (ticks >= TICKS_TO_SPEEDUP) {
+				ticks = 0;
+				INTERVAL = Math.floor(SPEEDUP_FACTOR * INTERVAL);
+			}
+		}
+	}(),
+
 	next = function () {
 		var paused = true,
 			next_fn,
@@ -605,7 +617,7 @@ function newPiece(now) {
 	return {
 		blocks: blocks,
 		orientation: 0,
-		pending_drop: now + DROP_INTERVAL,
+		pending_drop: now + INTERVAL,
 		pending_settle: 0,
 		pending_moves: [],
 		pending_slam: false,
@@ -655,6 +667,7 @@ function playerLoop() {
 			gameOver();
 			return;
 		}
+		speedupTick(10);
 	}
 
 	if (piece.pending_settle) {
@@ -664,36 +677,40 @@ function playerLoop() {
 			matches = matchScan();
 
 			if (matches.length > 0) {
-				next(setMatches, [matches], SETTLE_INTERVAL);
+				next(setMatches, [matches], INTERVAL);
 				return;
 			}
 			next(playerLoop);
 			return;
 		}
 	} else if (!piece.checkMove(down)) {
-		piece.pending_settle = now + SETTLE_INTERVAL;
+		piece.pending_settle = now + INTERVAL;
 		piece.pending_drop = 0;
 	} else if (piece.pending_drop && piece.pending_drop <= now) {
 		piece.move(down);
-		piece.pending_drop = now + DROP_INTERVAL;
+		piece.pending_drop = now + INTERVAL;
+		speedupTick();
 	}
 
 	m = piece.pending_moves.pop();
 	if (m && playerMove(m)) {
 		if (m === down && piece.checkMove(down)) {
-			// Reset drop timer when piece is moved down
-			piece.pending_drop = now + DROP_INTERVAL;
+			// Reset drop timer (but update speedup ticks) when piece is
+			// moved down
+			piece.pending_drop = now + INTERVAL;
+			speedupTick();
 		} else {
 			if (piece.pending_settle && piece.checkMove(down)) {
 				// Unset the settle timer and re-set drop timer if the move has
 				// resulted in more possible down moves.
 				piece.pending_settle = 0;
-				piece.pending_drop = now + DROP_INTERVAL;
+				piece.pending_drop = now + INTERVAL;
 			}
 		}
 	} else if (!m && piece.pending_slam) {
 		while (piece.checkMove(down)) {
 			piece.move(down);
+			speedupTick();
 		}
 		piece.pending_settle = now;
 	}
@@ -750,13 +767,13 @@ function cascadeLoop(npps) {
 	if (new_npps.length < npps.length) {
 		matches = matchScan();
 		if (matches.length > 0) {
-			next(setMatches, [matches], SETTLE_INTERVAL);
+			next(setMatches, [matches], INTERVAL);
 			return;
 		}
 	}
 
 	next.apply(null, (new_npps.length > 0)
-		? [cascadeLoop, [new_npps], DROP_INTERVAL_CASCADE]
+		? [cascadeLoop, [new_npps], INTERVAL]
 		: [playerLoop]
 	);
 }
@@ -770,7 +787,7 @@ function setMatches(matches) {
 
 		board[matches[i]] = MATCH_PENDING;
 	}
-	next(clearMatches, [matches], MATCH_PAUSE);
+	next(clearMatches, [matches], INTERVAL);
 
 }
 
@@ -789,7 +806,7 @@ function clearMatches(matches) {
 
 	npps = cascadeScan();
 	next.apply(null, (npps.length > 0)
-		? [cascadeLoop, [npps], DROP_INTERVAL_CASCADE]
+		? [cascadeLoop, [npps], INTERVAL]
 		: [playerLoop]
 	);
 }
