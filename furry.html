@@ -3,6 +3,15 @@
 	a {
 		cursor: pointer;
 	}
+	.controls {
+		float: left;
+		line-height: 1.8;
+		list-style-type: none;
+		margin-left: none;
+	}
+	ul.controls {
+		padding-left: 0;
+	}
 	.board {
 		position: relative;
 		margin: 0 auto;
@@ -93,6 +102,13 @@
 		<a id="speed-med" class="med">med</a>
 		<a id="speed-high" class="high">high</a>
 	</li>
+	<li id="level">
+		<label>level
+			<input id="level-input" type="range" min=5 max=20 value=5 step=1>
+		</label>
+		<span id="level-show">5</span>
+	</li>
+</ul>
 
 <div id="board" class="board"></div>
 <script>
@@ -102,6 +118,7 @@ var
 	// Basic game parameters
 	BOARD_WIDTH = 8,
 	BOARD_HEIGHT = 17, // allow an extra top row for rotation
+	MAX_START_HEIGHT = 13,
 	NUM_COLORS = 3,
 	NUM_TO_MATCH = 4, // pieces in a row required for match
 	DEFAULT_LOOP_DELAY = 20,
@@ -116,10 +133,7 @@ var
 	// Game start parameters
 
 	INTERVAL = SPEED.low, // starting speed; ms for a drop, etc.
-	START_HEIGHT = 8,
-	// Probabilistic density of pieces on starting board, between 0 (nothing)
-	// and 1 (completely full)
-	START_DENSITY = 0.8,
+	LEVEL = 5,
 	// Max consecutive instances of any one color to start
 	START_MAX_IN_A_ROW = 2,
 
@@ -552,6 +566,12 @@ function cascadeScan() {
 }
 
 function initBoard() {
+	var START_HEIGHT = Math.floor(LEVEL * (MAX_START_HEIGHT / (BOARD_HEIGHT - 1)) / 20 * BOARD_HEIGHT),
+		// Probabilistic density of pieces on starting board, between 0 (nothing)
+		// and 1 (completely full)
+		// This varies with level 5-20 between 0.5 and 0.75
+		START_DENSITY = (LEVEL - 5) / 60 + 0.5;
+
 	(function fill(p, allow_empty) {
 		if (p >= START_HEIGHT * BOARD_WIDTH) {
 			board[p] = 0;
@@ -868,6 +888,22 @@ $('start').addEventListener('click', playPause);
 			speed_box.className = e.target.className;
 			INTERVAL = SPEED[e.target.className];
 		}
+	});
+}());
+
+(function bindLevel() {
+	var level_input = $('level-input'),
+		level_show = $('level-show');
+
+	level_input.value = LEVEL;
+	level_show.innerHTML = LEVEL;
+
+	level_input.addEventListener('change', function (e) {
+		if (gameStarted()) {
+			return false;
+		}
+		level_show.innerHTML = level_input.value;
+		LEVEL = level_input.value;
 	});
 }());
 
