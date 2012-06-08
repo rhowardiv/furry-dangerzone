@@ -76,6 +76,7 @@
 	}
 
 </style>
+<a id="start">start</a>
 <div id="board" class="board"></div>
 <script>
 var
@@ -362,7 +363,51 @@ var
 	board = [],
 
 	// The controllable piece, if one exists
-	piece
+	piece,
+
+	next = function () {
+		var paused = true,
+			next_fn,
+			next_args;
+
+		return function (fn, args, interval) {
+			if (paused) {
+				if (arguments.length === 0) {
+					paused = false;
+					fn = next_fn;
+					args = next_args;
+					interval = 1;
+					next_fn = null;
+					next_args = null;
+				} else {
+					next_fn = fn;
+					next_args = args;
+					return;
+				}
+			}
+			renderer.render(board);
+			setTimeout(
+				function () {
+					fn.apply(null, args);
+				},
+				interval || DEFAULT_LOOP_DELAY
+			);
+		};
+	}(),
+
+	// todo: pausing; this just starts for now
+	playPause = function () {
+		var start = true;
+		return function () {
+			if (board.length === 0) {
+				if (start) {
+					initBoard();
+					start = false;
+				}
+			}
+			next();
+		};
+	}()
 ;
 
 function colorOf(p) {
@@ -749,16 +794,6 @@ function clearMatches(matches) {
 	);
 }
 
-function next(fn, args, interval) {
-	renderer.render(board);
-	setTimeout(
-		function () {
-			fn.apply(null, args);
-		},
-		interval || DEFAULT_LOOP_DELAY
-	);
-}
-
 function queueMove(direction) {
 	if (piece && !piece.pending_slam) {
 		piece.pending_moves.unshift(direction);
@@ -766,9 +801,9 @@ function queueMove(direction) {
 }
 
 renderer.init();
+next(playerLoop);
 
-initBoard();
-playerLoop();
+$('start').addEventListener('click', playPause);
 
 window.addEventListener('keydown', function (e) {
 	var d;
@@ -798,9 +833,7 @@ window.addEventListener('keydown', function (e) {
 			queueMove(left);
 			return false;
 		case 27: // ESC
-			// debug -- STOP!!
-			renderer.render(board);
-			next = null;
+			//playPause();
 			return false;
 
 		// currently not using these keys
