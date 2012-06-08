@@ -1,5 +1,8 @@
 <!DOCTYPE html>
 <style>
+	a {
+		cursor: pointer;
+	}
 	.board {
 		position: relative;
 		margin: 0 auto;
@@ -8,6 +11,11 @@
 	.block {
 		position: absolute;
 		text-align: center;
+	}
+	.low .low,
+	.med .med,
+	.high .high {
+		font-weight: bold;
 	}
 	.c0 {
 		background-color: black;
@@ -76,7 +84,16 @@
 	}
 
 </style>
-<a id="start">start</a>
+<ul class="controls">
+	<li>
+		<a id="start" class="start">start</a>
+	</li>
+	<li id="speed">
+		<a id="speed-low" class="low">low</a>
+		<a id="speed-med" class="med">med</a>
+		<a id="speed-high" class="high">high</a>
+	</li>
+
 <div id="board" class="board"></div>
 <script>
 var
@@ -90,10 +107,15 @@ var
 	DEFAULT_LOOP_DELAY = 20,
 	TICKS_TO_SPEEDUP = 600, // downward moves plus new pieces * 10; change to time?
 	SPEEDUP_FACTOR = 0.8,
+	SPEED = {
+		low: 800,
+		med: 630,
+		high: 460,
+	},
 
 	// Game start parameters
 
-	INTERVAL = 600, // speed; ms for a drop / match highlight
+	INTERVAL = SPEED.low, // starting speed; ms for a drop, etc.
 	START_HEIGHT = 8,
 	// Probabilistic density of pieces on starting board, between 0 (nothing)
 	// and 1 (completely full)
@@ -416,11 +438,17 @@ var
 					initBoard();
 					start = false;
 				}
+			} else {
+				return; // nothing for now!
 			}
 			next();
 		};
 	}()
 ;
+
+function gameStarted() {
+	return board.length > 0;
+}
 
 function colorOf(p) {
 	return (board[p] & ~CONNECTIONS) % NUM_COLORS;
@@ -819,8 +847,29 @@ function queueMove(direction) {
 
 renderer.init();
 next(playerLoop);
-
 $('start').addEventListener('click', playPause);
+
+(function bindSpeed() {
+	var i,
+		speed_box = $('speed'),
+		speeds = Object.keys(SPEED);
+
+	for (i = 0; i < speeds.length; i++) {
+		if (INTERVAL === SPEED[speeds[i]]) {
+			speed_box.className = speeds[i];
+		}
+	}
+
+	speed_box.addEventListener('click', function (e) {
+		if (gameStarted()) {
+			return;
+		}
+		if (Object.keys(SPEED).indexOf(e.target.className) > -1) {
+			speed_box.className = e.target.className;
+			INTERVAL = SPEED[e.target.className];
+		}
+	});
+}());
 
 window.addEventListener('keydown', function (e) {
 	var d;
@@ -850,7 +899,7 @@ window.addEventListener('keydown', function (e) {
 			queueMove(left);
 			return false;
 		case 27: // ESC
-			//playPause();
+			playPause();
 			return false;
 
 		// currently not using these keys
