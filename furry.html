@@ -94,9 +94,6 @@
 
 </style>
 <ul class="controls">
-	<li>
-		<a id="start" class="start">start</a>
-	</li>
 	<li id="speed">
 		<a id="speed-low" class="low">low</a>
 		<a id="speed-med" class="med">med</a>
@@ -108,9 +105,20 @@
 		</label>
 		<span id="level-show">5</span>
 	</li>
+	<li id="server">
+		<fieldset id="multiplayer">
+			<legend>Multiplayer server</legend>
+			<input type="text" id="nickname" placeholder="nickname">
+			<input type="text" id="host" placeholder="host">
+		</fieldset>
+	</li>
+	<li>
+		<a id="start" class="start">start</a>
+	</li>
 </ul>
 
 <div id="board" class="board"></div>
+<script src="socket.io.js"></script>
 <script>
 var
 	$ = function (id) { return document.getElementById(id); },
@@ -400,6 +408,10 @@ var
 	// The controllable piece, if one exists
 	piece,
 
+	// socket.io multiplayer connection
+	socket,
+	is_boss = false,
+
 	// countdown to a speedup
 	speedupTick = function () {
 		var ticks = 0;
@@ -446,14 +458,28 @@ var
 	// todo: pausing; this just starts for now
 	playPause = function () {
 		var start = true;
-		return function () {
-			if (board.length === 0) {
-				if (start) {
-					initBoard();
-					start = false;
+		return function (socket_force) {
+			if (board.length > 0) {
+				return; // no unpause yet
+			}
+			if (start) {
+				if (socket && !socket_force) {
+					if (!is_boss) {
+						// only boss can start multiplayer
+						return;
+					} else {
+						socket.emit("start");
+						// everyone else will get the "start" signal
+						// from the socket; send a "signal" to
+						// myself here:
+						setTimeout(function () {
+							playPause(true);
+						}, 80);
+						return;
+					}
 				}
-			} else {
-				return; // nothing for now!
+				initBoard();
+				start = false;
 			}
 			next();
 		};
@@ -867,7 +893,7 @@ function queueMove(direction) {
 
 renderer.init();
 next(playerLoop);
-$('start').addEventListener('click', playPause);
+$('start').addEventListener('click', function () { playPause(); });
 
 (function bindSpeed() {
 	var i,
@@ -906,6 +932,37 @@ $('start').addEventListener('click', playPause);
 		LEVEL = level_input.value;
 	});
 }());
+
+(function bindMultiplayer() {
+	var nick_input = $('nickname'),
+		host_input = $('host');
+
+	$('multiplayer').addEventListener('change', function (e) {
+		var nick = nick_input.value,
+			host = host_input.value;
+
+		if (nick && host) {
+			startSocket(host, nick);
+		}
+
+	});
+
+}());
+
+function startSocket(host, nick) {
+	socket = io.connect("http://" + host + ":3939");
+	socket.on("connect", function () {
+		socket.emit("hello", nick);
+	});
+	socket.on("boss", function () {
+		console.log("You're the boss!");
+		// Once you're the boss you will stay the boss.
+		is_boss = true;
+	});
+	socket.on("hello", function (nick) {
+		console.log(nick + ' has joined.');
+	});
+}
 
 window.addEventListener('keydown', function (e) {
 	var d;
