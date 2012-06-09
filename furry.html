@@ -13,9 +13,26 @@
 		padding-left: 0;
 	}
 	.board {
-		position: relative;
-		margin: 0 auto;
+		position: absolute;
+		top: 3%;
+		right: 3%;
 		background: black;
+	}
+	.enemy-boards {
+		clear: left;
+		width: 50%;
+	}
+	.enemy-board {
+		float: left;
+		position: relative;
+		margin: 1em, 5%;
+		background: black;
+	}
+	.enemy-board .name {
+		font-size: 50%;
+		position: absolute;
+		top: -1.5em;
+		left: 0;
 	}
 	.block {
 		position: absolute;
@@ -116,6 +133,8 @@
 		<a id="start" class="start">start</a>
 	</li>
 </ul>
+<div id="enemy-boards" class="enemy-boards">
+</div>
 
 <div id="board" class="board"></div>
 <script src="socket.io.js"></script>
@@ -350,48 +369,77 @@ var
 			return (o + 3) % 4;
 		}
 	},
-	renderer = {
-		board_dom: null,
-		init: function () {
-			this.board_dom = this.setupBoardDom(BOARD_WIDTH, BOARD_HEIGHT);
+	Renderer = function () {
+		var local_block_size;
 
-		},
-		setupBoardDom: function (w, h) {
-			var board_dom = $("board"),
-				screen_w = window.document.documentElement.clientWidth,
-				screen_h = window.document.documentElement.clientHeight,
-				block_size = Math.floor(0.95 * (Math.min(screen_w, screen_h) / Math.max(w, h))),
-				board_w = block_size * w,
-				board_h = block_size * h,
-				i, j, e
-			;
-
-			board_dom.style.width = board_w + "px";
-			board_dom.style.height = board_h + "px";
-
-			for (i = 0; i < h; i++) {
-				for (j = 0; j < w; j++) {
+		return function (nick) {
+			return {
+				board_dom: null,
+				init: init,
+				block_size: 0,
+				setupBoardDom: nick ? setupBoardDomEnemy : setupBoardDom,
+				render: render
+			};
+		};
+		function init(nick) {
+			this.board_dom = this.setupBoardDom(nick);
+		}
+		function makeBlocks(board_dom, block_size) {
+			var i, j, e;
+			for (i = 0; i < BOARD_HEIGHT; i++) {
+				for (j = 0; j < BOARD_WIDTH; j++) {
 					e = document.createElement("div");
 					e.className = "c0 block";
 					e.style.bottom = i * block_size + "px";
 					e.style.left = j * block_size + "px";
 					e.style.width = block_size + "px";
 					e.style.height = block_size + "px";
-					e.innerHTML = (i * BOARD_WIDTH) + j;
+					//e.innerHTML = (i * BOARD_WIDTH) + j;
 					board_dom.appendChild(e);
 				}
 			}
+		}
+		function setupBoardDom() {
+			var board_dom = $("board"),
+				screen_w = window.document.documentElement.clientWidth,
+				screen_h = window.document.documentElement.clientHeight;
 
+			local_block_size = Math.floor(0.95 * (
+				Math.min(screen_w, screen_h) / Math.max(BOARD_WIDTH, BOARD_HEIGHT)
+			));
+
+			board_dom.style.width = local_block_size * BOARD_WIDTH + "px";
+			board_dom.style.height = local_block_size * BOARD_HEIGHT + "px";
+
+			makeBlocks(board_dom, local_block_size);
 			return board_dom;
-		},
+		}
+		function setupBoardDomEnemy(nick) {
+			var board_dom = document.createElement("div"),
+				block_size = Math.floor(local_block_size / 3),
+				name_dom = document.createElement("div");
 
-		render: function (board) {
+			board_dom.className = 'enemy-board';
+			board_dom.style.width = block_size * BOARD_WIDTH + "px";
+			board_dom.style.height = block_size * BOARD_HEIGHT + "px";
+
+			makeBlocks(board_dom, block_size);
+			name_dom.innerHTML = nick;
+			name_dom.className = 'name';
+			board_dom.appendChild(name_dom);
+			$("enemy-boards").appendChild(board_dom);
+			return board_dom;
+		}
+		function render(board) {
 			var i, c = this.board_dom.childNodes;
 			for (i = 0; i < board.length; i++) {
-				c[i].className = "block c" + (board[i] % 256) + " b" + (board[i] >> 8);
+				c[i].className = "block c" + (board[i] % 256)
+					+ " b" + (board[i] >> 8);
 			}
 		}
-	},
+	}(),
+	renderer = Renderer(),
+	enemy_renderers = {},
 
 	// A list of integers representing the state of every spot on the board,
 	// starting from the lower left. Possible states, where n = NUM_COLORS:
@@ -428,7 +476,21 @@ var
 	next = function () {
 		var paused = true,
 			next_fn,
-			next_args;
+			next_args,
+			prev_board;
+
+		function boardsEqual(bp, bn) {
+			var i;
+			if (bp.length !== bn.length) {
+				return false;
+			}
+			for (i = 0; i < bp.length; i++) {
+				if (bp[i] !== bn[i]) {
+					return false;
+				}
+			}
+			return true;
+		}
 
 		return function (fn, args, interval) {
 			if (paused) {
@@ -445,7 +507,13 @@ var
 					return;
 				}
 			}
-			renderer.render(board);
+			if (!prev_board || !boardsEqual(prev_board, board)) {
+				if (socket) {
+					socket.emit("board", board);
+				}
+				renderer.render(board);
+				prev_board = board.slice(0);
+			}
 			setTimeout(
 				function () {
 					fn.apply(null, args);
@@ -465,7 +533,7 @@ var
 			if (start) {
 				if (socket && !socket_force) {
 					if (!is_boss) {
-						// only boss can start multiplayer
+						console.log("Only boss can start!");
 						return;
 					} else {
 						socket.emit("start");
@@ -961,6 +1029,12 @@ function startSocket(host, nick) {
 	});
 	socket.on("hello", function (nick) {
 		console.log(nick + ' has joined.');
+		enemy_renderers[nick] = Renderer(nick);
+		enemy_renderers[nick].init(nick);
+	});
+	socket.on("start", function () { playPause(true); });
+	socket.on("board", function (other_board) {
+		enemy_renderers[other_board.nick].render(other_board.board);
 	});
 }
 

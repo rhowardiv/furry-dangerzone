@@ -1,9 +1,11 @@
 /*
  * Hi, I'm the multiplayer server.
+ * Start me with something like
+ * NODE_PATH=/path/to/node_modules node server.js
  */
 
 var PORT = 3939,
-	io = require("/usr/lib/node_modules/socket.io").listen(PORT),
+	io = require("socket.io").listen(PORT),
 	// sockets keyed by nicknames
 	clients = {},
 	// times of connections, keyed by nicknames
@@ -15,20 +17,30 @@ io.sockets.on("connection", function (socket) {
 	var socket_id;
 
 	socket.on("hello", function (from) {
+		var i;
 		console.log("hello from " + from);
 		socket_id = from;
 		socket.broadcast.emit("hello", socket_id);
 		clients[socket_id] = socket;
-		connect_times[socket_id] = +new Date;
+		connect_times[socket_id] = +new Date();
 		if (Object.keys(clients).length === 1) {
 			// A lone client should always be boss
 			setBoss(socket_id);
+		} else {
+			for (i in clients) {
+				if (i !== from) {
+					// hellos are important
+					socket.emit("hello", i);
+				}
+			}
 		}
+		console.log("clients " + JSON.stringify(Object.keys(clients)));
 	});
 	socket.on("disconnect", function () {
 		delete clients[socket_id];
 		delete connect_times[socket_id];
 		if (socket_id === boss) {
+			boss = null;
 			pickNewBoss();
 		}
 	});
@@ -39,7 +51,7 @@ io.sockets.on("connection", function (socket) {
 		});
 	});
 	socket.on("board", function (board) {
-		socket.broadcast.emit("board", board);
+		socket.broadcast.emit("board", {nick: socket_id, board: board});
 	});
 	socket.on("win", function (from) {
 		socket.broadcast.emit("win", from);
@@ -63,7 +75,7 @@ function setBoss(socket_id) {
 
 function pickNewBoss() {
 	var ids = Object.keys(clients),
-		oldest_time = +new Date + 1,
+		oldest_time = +new Date() + 1,
 		oldest_id,
 		i;
 	
