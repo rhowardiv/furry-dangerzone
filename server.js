@@ -21,6 +21,7 @@ io.sockets.on("connection", function (socket) {
 		var i;
 		console.log("hello from " + from);
 		socket_id = from;
+
 		socket.broadcast.emit("hello", socket_id);
 		clients[socket_id] = socket;
 		connect_times[socket_id] = +new Date();
@@ -41,6 +42,9 @@ io.sockets.on("connection", function (socket) {
 		delete clients[socket_id];
 		delete connect_times[socket_id];
 		delete attrition[socket_id];
+		console.log(socket_id  + " left.");
+		console.log("clients " + JSON.stringify(Object.keys(clients)));
+		socket.broadcast.emit("bye", socket_id);
 		if (socket_id === boss) {
 			boss = null;
 			pickNewBoss();
@@ -53,7 +57,10 @@ io.sockets.on("connection", function (socket) {
 	});
 	socket.on("start", function () {
 		socket.get("boss", function (e, is_boss) {
-			// Only bosses can start the game
+			if (!is_boss) {
+				return;
+			}
+			socket.emit("start");
 			socket.broadcast.emit("start");
 		});
 		beginAttrition();
@@ -97,14 +104,19 @@ function pickNewBoss() {
 		oldest_id,
 		i;
 
+	console.log("Picking new boss...");
+
 	for (i = 0; i < ids.length; i++) {
-		if (connect_times[i] <= oldest_time) {
+		if (connect_times[ids[i]] <= oldest_time) {
 			oldest_time = connect_times[i];
 			oldest_id = ids[i];
 		}
 	}
 	if (oldest_id) {
 		setBoss(oldest_id);
+		console.log("New boss is " + oldest_id);
+	} else {
+		console.log("No new boss!");
 	}
 }
 
