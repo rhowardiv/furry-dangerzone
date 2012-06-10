@@ -323,6 +323,7 @@ var
 	// socket.io multiplayer connection
 	socket,
 	is_boss = false,
+	game_over = false,
 
 	// countdown to a speedup
 	speedupTick = function () {
@@ -357,6 +358,9 @@ var
 		}
 
 		return function (fn, args, interval) {
+			if (game_over) {
+				return;
+			}
 			if (paused) {
 				if (arguments.length === 0) {
 					paused = false;
@@ -391,7 +395,7 @@ var
 	playPause = function () {
 		var start = true;
 		return function (socket_force) {
-			if (board.length > 0) {
+			if (isGameStarted()) {
 				return; // no unpause yet
 			}
 			if (start) {
@@ -417,8 +421,8 @@ var
 		};
 	}();
 
-function gameStarted() {
-	return board.length > 0;
+function isGameStarted() {
+	return board.length > 0 && !game_over;
 }
 
 function colorOf(p) {
@@ -554,7 +558,7 @@ function initBoard() {
 }
 
 function gameOver() {
-	console.log("GAME OVER!");
+	game_over = true;
 }
 
 function isWin() {
@@ -567,8 +571,22 @@ function isWin() {
 	return true;
 }
 
-function win() {
-	console.log("YOU WIN!");
+function win(from_socket) {
+	gameOver();
+	if (!socket || from_socket) {
+		console.log("You WIN!");
+		return;
+	}
+	socket.emit("win");
+}
+
+function lose(from_socket) {
+	gameOver();
+	if (!socket || from_socket) {
+		console.log("You LOSE!");
+		return;
+	}
+	socket.emit("lose");
 }
 
 function checkMove(direction) {
@@ -670,7 +688,7 @@ function playerLoop() {
 	if (!piece) {
 		piece = newPiece(now);
 		if (!piece) {
-			gameOver();
+			lose();
 			return;
 		}
 		speedupTick(10);
@@ -748,7 +766,6 @@ function playerMove(m) {
 
 	piece.move(m);
 	return true;
-
 }
 
 function nppSort(npp1, npp2) {
@@ -837,7 +854,7 @@ $('start').addEventListener('click', function () { playPause(); });
 	}
 
 	speed_box.addEventListener('click', function (e) {
-		if (gameStarted()) {
+		if (isGameStarted()) {
 			return;
 		}
 		if (Object.keys(SPEED).indexOf(e.target.className) > -1) {
@@ -855,7 +872,7 @@ $('start').addEventListener('click', function () { playPause(); });
 	level_show.innerHTML = level;
 
 	level_input.addEventListener('change', function (e) {
-		if (gameStarted()) {
+		if (isGameStarted()) {
 			return false;
 		}
 		level_show.innerHTML = level_input.value;
@@ -894,9 +911,17 @@ function startSocket(host, nick) {
 		enemy_renderers[nick] = Renderer(nick);
 		enemy_renderers[nick].init(nick);
 	});
-	socket.on("start", function () { playPause(true); });
+	socket.on("start", function () {
+		playPause(true);
+	});
 	socket.on("board", function (other_board) {
 		enemy_renderers[other_board.nick].render(other_board.board);
+	});
+	socket.on("lose", function () {
+		lose(true);
+	});
+	socket.on("win", function () {
+		win(true);
 	});
 }
 
@@ -928,8 +953,9 @@ window.addEventListener('keydown', function (e) {
 			queueMove(left);
 			return false;
 		case 27: // ESC
-			playPause();
-			return false;
+			if (isGameStarted()) {
+				lose();
+			}
 
 		// currently not using these keys
 		// todo: remove once control scheme gels

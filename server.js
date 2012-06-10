@@ -10,7 +10,8 @@ var PORT = 3939,
 	clients = {},
 	// times of connections, keyed by nicknames
 	connect_times = {},
-	boss;
+	boss,
+	attrition = {};
 
 io.sockets.on("connection", function (socket) {
 
@@ -39,9 +40,15 @@ io.sockets.on("connection", function (socket) {
 	socket.on("disconnect", function () {
 		delete clients[socket_id];
 		delete connect_times[socket_id];
+		delete attrition[socket_id];
 		if (socket_id === boss) {
 			boss = null;
 			pickNewBoss();
+		}
+		if (winner = findWinnerByAttrition()) {
+			clients[winner].broadcast.emit("lose");
+			clients[winner].emit("win");
+			attrition = {};
 		}
 	});
 	socket.on("start", function () {
@@ -49,12 +56,23 @@ io.sockets.on("connection", function (socket) {
 			// Only bosses can start the game
 			socket.broadcast.emit("start");
 		});
+		beginAttrition();
 	});
 	socket.on("board", function (board) {
 		socket.broadcast.emit("board", {nick: socket_id, board: board});
 	});
 	socket.on("win", function (from) {
-		socket.broadcast.emit("win", from);
+		socket.broadcast.emit("lose", from);
+		socket.emit("win");
+		attrition = {};
+	});
+	socket.on("lose", function () {
+		delete attrition[socket_id];
+		if (winner = findWinnerByAttrition()) {
+			clients[winner].broadcast.emit("lose");
+			clients[winner].emit("win");
+			attrition = {};
+		}
 	});
 });
 
@@ -78,7 +96,7 @@ function pickNewBoss() {
 		oldest_time = +new Date() + 1,
 		oldest_id,
 		i;
-	
+
 	for (i = 0; i < ids.length; i++) {
 		if (connect_times[i] <= oldest_time) {
 			oldest_time = connect_times[i];
@@ -88,4 +106,17 @@ function pickNewBoss() {
 	if (oldest_id) {
 		setBoss(oldest_id);
 	}
+}
+
+function beginAttrition() {
+	var i;
+	attrition = {};
+	for (i in clients) {
+		attrition[i] = true;
+	}
+}
+
+function findWinnerByAttrition() {
+	var k = Object.keys(attrition);
+	return (k.length === 1) ? k[0] : false;
 }
