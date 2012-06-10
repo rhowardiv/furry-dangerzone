@@ -392,34 +392,28 @@ var
 	}(),
 
 	// todo: pausing; this just starts for now
-	playPause = function () {
-		var start = true;
-		return function (socket_force) {
-			if (isGameStarted()) {
-				return; // no unpause yet
+	playPause = function (socket_force) {
+		if (isGameStarted()) {
+			return; // no unpause yet
+		}
+		if (socket && !socket_force) {
+			if (!is_boss) {
+				console.log("Only boss can start!");
+				return;
+			} else {
+				socket.emit("start");
+				// everyone else will get the "start" signal
+				// from the socket; send a "signal" to
+				// myself here:
+				setTimeout(function () {
+					playPause(true);
+				}, 80);
+				return;
 			}
-			if (start) {
-				if (socket && !socket_force) {
-					if (!is_boss) {
-						console.log("Only boss can start!");
-						return;
-					} else {
-						socket.emit("start");
-						// everyone else will get the "start" signal
-						// from the socket; send a "signal" to
-						// myself here:
-						setTimeout(function () {
-							playPause(true);
-						}, 80);
-						return;
-					}
-				}
-				initBoard();
-				start = false;
-			}
-			next();
-		};
-	}();
+		}
+		initBoard();
+		next();
+	};
 
 function isGameStarted() {
 	return board.length > 0 && !game_over;
@@ -907,7 +901,7 @@ function startSocket(host, nick) {
 		is_boss = true;
 	});
 	socket.on("hello", function (nick) {
-		console.log(nick + ' has joined.');
+		console.log(nick + ' is here.');
 		enemy_renderers[nick] = Renderer(nick);
 		enemy_renderers[nick].init(nick);
 	});
