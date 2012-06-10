@@ -1,3 +1,4 @@
+/*jshint laxbreak: true, loopfunc: true*/
 var
 	$ = function (id) { return document.getElementById(id); },
 
@@ -13,15 +14,15 @@ var
 	SPEED = {
 		low: 800,
 		med: 630,
-		high: 460,
+		high: 460
 	},
+	// Max consecutive instances of any one color to start
+	START_MAX_IN_A_ROW = 2,
 
 	// Game start parameters
 
-	INTERVAL = SPEED.low, // starting speed; ms for a drop, etc.
-	LEVEL = 5,
-	// Max consecutive instances of any one color to start
-	START_MAX_IN_A_ROW = 2,
+	interval = SPEED.low, // starting speed; ms for a drop, etc.
+	level = 5,
 
 	// Bits that indicate connections
 	CONNECT_TOP = 0x0100,
@@ -213,7 +214,7 @@ var
 					(ss[1] ^ CONNECT_TOP) | CONNECT_RIGHT
 				]; }
 			][o](ss);
-		},
+		}
 	},
 	// How orientation changes when moving
 	rotation_orient = {
@@ -240,9 +241,11 @@ var
 				render: render
 			};
 		};
+
 		function init(nick) {
 			this.board_dom = this.setupBoardDom(nick);
 		}
+
 		function makeBlocks(board_dom, block_size) {
 			var i, j, e;
 			for (i = 0; i < BOARD_HEIGHT; i++) {
@@ -258,6 +261,7 @@ var
 				}
 			}
 		}
+
 		function setupBoardDom() {
 			var board_dom = $("board"),
 				screen_w = window.document.documentElement.clientWidth,
@@ -273,6 +277,7 @@ var
 			makeBlocks(board_dom, local_block_size);
 			return board_dom;
 		}
+
 		function setupBoardDomEnemy(nick) {
 			var board_dom = document.createElement("div"),
 				block_size = Math.floor(local_block_size / 3),
@@ -289,6 +294,7 @@ var
 			$("enemy-boards").appendChild(board_dom);
 			return board_dom;
 		}
+
 		function render(board) {
 			var i, c = this.board_dom.childNodes;
 			for (i = 0; i < board.length; i++) {
@@ -309,7 +315,6 @@ var
 	// 2n+1 matched blocks
 	//  ... Player block states can have the bits 2^8-11 flipped on to
 	// indicate bindings to the top, right, bottom and left, respectively.
-	// Note that since connections bits start at 256, max NUM_COLORS is 127.
 	board = [],
 
 	// The controllable piece, if one exists
@@ -327,9 +332,9 @@ var
 			ticks += n;
 			if (ticks >= TICKS_TO_SPEEDUP) {
 				ticks = 0;
-				INTERVAL = Math.floor(SPEEDUP_FACTOR * INTERVAL);
+				interval = Math.floor(SPEEDUP_FACTOR * interval);
 			}
-		}
+		};
 	}(),
 
 	next = function () {
@@ -410,8 +415,7 @@ var
 			}
 			next();
 		};
-	}()
-;
+	}();
 
 function gameStarted() {
 	return board.length > 0;
@@ -441,8 +445,7 @@ function match(direction, p) {
 function matchScan() {
 	var p,
 		check_match,
-		matches = []
-	;
+		matches = [];
 	for (p = 0; p < board.length; p++) {
 		[up, right].forEach(function (dir) {
 			check_match = match(dir, p);
@@ -454,6 +457,10 @@ function matchScan() {
 	return matches;
 }
 
+function isPlayerBlock(p) {
+	return board[p] > NUM_COLORS;
+}
+
 function canCascade(p, npps, from_conn) {
 	from_conn = from_conn || 0;
 
@@ -463,11 +470,9 @@ function canCascade(p, npps, from_conn) {
 		further_connections = (board[p] & (CONNECTIONS ^ from_conn)),
 		conn_check,
 		conn_cascades = [],
-		i
-	;
+		i;
 
-	if (board[p] <= NUM_COLORS) {
-		// Only player blocks can cascade.
+	if (!isPlayerBlock(p)) {
 		return [];
 	}
 
@@ -499,10 +504,11 @@ function canCascade(p, npps, from_conn) {
 
 function cascadeScan() {
 	var i, j,
+		// "Non-Player Pieces"
 		npps = [],
 		cascade_check,
-		already_cascading = {}
-	;
+		already_cascading = {};
+
 	// We can skip the first row for obvious reasons
 	for (i = BOARD_WIDTH; i < board.length; i++) {
 		if (already_cascading.hasOwnProperty(i)) {
@@ -519,11 +525,11 @@ function cascadeScan() {
 }
 
 function initBoard() {
-	var START_HEIGHT = Math.floor(LEVEL * (MAX_START_HEIGHT / (BOARD_HEIGHT - 1)) / 20 * BOARD_HEIGHT),
+	var START_HEIGHT = Math.floor(level * (MAX_START_HEIGHT / (BOARD_HEIGHT - 1)) / 20 * BOARD_HEIGHT),
 		// Probabilistic density of pieces on starting board, between 0 (nothing)
 		// and 1 (completely full)
 		// This varies with level 5-20 between 0.5 and 0.75
-		START_DENSITY = (LEVEL - 5) / 60 + 0.5;
+		START_DENSITY = (level - 5) / 60 + 0.5;
 
 	(function fill(p, allow_empty) {
 		if (p >= START_HEIGHT * BOARD_WIDTH) {
@@ -567,8 +573,8 @@ function win() {
 
 function checkMove(direction) {
 	var i,
-		moved = go[direction](this.blocks, this.orientation)
-	;
+		moved = go[direction](this.blocks, this.orientation);
+
 	for (i = 0; i < moved.length; i++) {
 		if (
 			0 !== board[moved[i]]
@@ -582,8 +588,8 @@ function checkMove(direction) {
 
 function move(direction) {
 	var i,
-		states = []
-	;
+		states = [];
+
 	for (i = 0; i < this.blocks.length; i++) {
 		states[i] = board[this.blocks[i]];
 		board[this.blocks[i]] = 0;
@@ -618,12 +624,12 @@ function newPiece(now) {
 	return {
 		blocks: blocks,
 		orientation: 0,
-		pending_drop: now + INTERVAL,
+		pending_drop: now + interval,
 		pending_settle: 0,
 		pending_moves: [],
 		pending_slam: false,
 		move: move,
-		checkMove: checkMove,
+		checkMove: checkMove
 	};
 }
 
@@ -654,13 +660,12 @@ function removeConnectionComplement(p) {
 }
 
 function playerLoop() {
-	var now = +new Date,
+	var now = +new Date(),
 		i, j,
 		m,
 		check_match = [],
 		matches = [],
-		npps = []
-	;
+		npps = [];
 
 	if (!piece) {
 		piece = newPiece(now);
@@ -678,18 +683,18 @@ function playerLoop() {
 			matches = matchScan();
 
 			if (matches.length > 0) {
-				next(setMatches, [matches], INTERVAL);
+				next(setMatches, [matches], interval);
 				return;
 			}
 			next(playerLoop);
 			return;
 		}
 	} else if (!piece.checkMove(down)) {
-		piece.pending_settle = now + INTERVAL;
+		piece.pending_settle = now + interval;
 		piece.pending_drop = 0;
 	} else if (piece.pending_drop && piece.pending_drop <= now) {
 		piece.move(down);
-		piece.pending_drop = now + INTERVAL;
+		piece.pending_drop = now + interval;
 		speedupTick();
 	}
 
@@ -698,14 +703,14 @@ function playerLoop() {
 		if (m === down && piece.checkMove(down)) {
 			// Reset drop timer (but update speedup ticks) when piece is
 			// moved down
-			piece.pending_drop = now + INTERVAL;
+			piece.pending_drop = now + interval;
 			speedupTick();
 		} else {
 			if (piece.pending_settle && piece.checkMove(down)) {
 				// Unset the settle timer and re-set drop timer if the move has
 				// resulted in more possible down moves.
 				piece.pending_settle = 0;
-				piece.pending_drop = now + INTERVAL;
+				piece.pending_drop = now + interval;
 			}
 		}
 	} else if (!m && piece.pending_slam) {
@@ -753,8 +758,7 @@ function nppSort(npp1, npp2) {
 function cascadeLoop(npps) {
 	var i,
 		matches,
-		new_npps
-	;
+		new_npps;
 
 	// Move the lowest npps first
 	npps.sort(nppSort);
@@ -768,13 +772,13 @@ function cascadeLoop(npps) {
 	if (new_npps.length < npps.length) {
 		matches = matchScan();
 		if (matches.length > 0) {
-			next(setMatches, [matches], INTERVAL);
+			next(setMatches, [matches], interval);
 			return;
 		}
 	}
 
 	next.apply(null, (new_npps.length > 0)
-		? [cascadeLoop, [new_npps], INTERVAL]
+		? [cascadeLoop, [new_npps], interval]
 		: [playerLoop]
 	);
 }
@@ -788,14 +792,13 @@ function setMatches(matches) {
 
 		board[matches[i]] = MATCH_PENDING;
 	}
-	next(clearMatches, [matches], INTERVAL);
+	next(clearMatches, [matches], interval);
 
 }
 
 function clearMatches(matches) {
 	var i,
-		npps = []
-	;
+		npps = [];
 
 	for (i = 0; i < matches.length; i++) {
 		board[matches[i]] = 0;
@@ -807,7 +810,7 @@ function clearMatches(matches) {
 
 	npps = cascadeScan();
 	next.apply(null, (npps.length > 0)
-		? [cascadeLoop, [npps], INTERVAL]
+		? [cascadeLoop, [npps], interval]
 		: [playerLoop]
 	);
 }
@@ -828,7 +831,7 @@ $('start').addEventListener('click', function () { playPause(); });
 		speeds = Object.keys(SPEED);
 
 	for (i = 0; i < speeds.length; i++) {
-		if (INTERVAL === SPEED[speeds[i]]) {
+		if (interval === SPEED[speeds[i]]) {
 			speed_box.className = speeds[i];
 		}
 	}
@@ -839,7 +842,7 @@ $('start').addEventListener('click', function () { playPause(); });
 		}
 		if (Object.keys(SPEED).indexOf(e.target.className) > -1) {
 			speed_box.className = e.target.className;
-			INTERVAL = SPEED[e.target.className];
+			interval = SPEED[e.target.className];
 		}
 	});
 }());
@@ -848,15 +851,15 @@ $('start').addEventListener('click', function () { playPause(); });
 	var level_input = $('level-input'),
 		level_show = $('level-show');
 
-	level_input.value = LEVEL;
-	level_show.innerHTML = LEVEL;
+	level_input.value = level;
+	level_show.innerHTML = level;
 
 	level_input.addEventListener('change', function (e) {
 		if (gameStarted()) {
 			return false;
 		}
 		level_show.innerHTML = level_input.value;
-		LEVEL = level_input.value;
+		level = level_input.value;
 	});
 }());
 
@@ -935,6 +938,7 @@ window.addEventListener('keydown', function (e) {
 		case 17: // ctrl
 		case 13: // enter
 		case 16: // shift
+		/* falls through */
 		default:
 			return true;
 	}
