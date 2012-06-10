@@ -238,7 +238,8 @@ var
 				init: init,
 				block_size: 0,
 				setupBoardDom: nick ? setupBoardDomEnemy : setupBoardDom,
-				render: render
+				render: render,
+				destruct: destruct
 			};
 		};
 
@@ -302,6 +303,10 @@ var
 					+ " b" + (board[i] >> 8);
 			}
 		}
+
+		function destruct() {
+			this.board_dom.parentNode.removeChild(this.board_dom);
+		}
 	}(),
 	renderer = Renderer(),
 	enemy_renderers = {},
@@ -339,10 +344,7 @@ var
 	}(),
 
 	next = function () {
-		var paused = true,
-			next_fn,
-			next_args,
-			prev_board;
+		var prev_board;
 
 		function boardsEqual(bp, bn) {
 			var i;
@@ -360,20 +362,6 @@ var
 		return function (fn, args, interval) {
 			if (game_over) {
 				return;
-			}
-			if (paused) {
-				if (arguments.length === 0) {
-					paused = false;
-					fn = next_fn;
-					args = next_args;
-					interval = 1;
-					next_fn = null;
-					next_args = null;
-				} else {
-					next_fn = fn;
-					next_args = args;
-					return;
-				}
 			}
 			if (!prev_board || !boardsEqual(prev_board, board)) {
 				if (socket) {
@@ -402,17 +390,12 @@ var
 				return;
 			} else {
 				socket.emit("start");
-				// everyone else will get the "start" signal
-				// from the socket; send a "signal" to
-				// myself here:
-				setTimeout(function () {
-					playPause(true);
-				}, 80);
 				return;
 			}
 		}
+		game_over = false;
 		initBoard();
-		next();
+		next(playerLoop);
 	};
 
 function isGameStarted() {
@@ -833,8 +816,9 @@ function queueMove(direction) {
 }
 
 renderer.init();
-next(playerLoop);
-$('start').addEventListener('click', function () { playPause(); });
+$('start').addEventListener('click', function () {
+	playPause();
+});
 
 (function bindSpeed() {
 	var i,
@@ -905,6 +889,11 @@ function startSocket(host, nick) {
 		enemy_renderers[nick] = Renderer(nick);
 		enemy_renderers[nick].init(nick);
 	});
+	socket.on("bye", function (nick) {
+		console.log(nick + ' left.');
+		enemy_renderers[nick].destruct();
+		delete enemy_renderers[nick];
+	});
 	socket.on("start", function () {
 		playPause(true);
 	});
@@ -950,6 +939,7 @@ window.addEventListener('keydown', function (e) {
 			if (isGameStarted()) {
 				lose();
 			}
+			return false;
 
 		// currently not using these keys
 		// todo: remove once control scheme gels
