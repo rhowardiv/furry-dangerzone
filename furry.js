@@ -327,6 +327,7 @@ var
 
 	// socket.io multiplayer connection
 	socket,
+	SOCKET_PORT = 3939,
 	is_boss = false,
 	game_over = false,
 
@@ -862,6 +863,8 @@ $('start').addEventListener('click', function () {
 	var nick_input = $('nickname'),
 		host_input = $('host');
 
+	host_input.value = location.hostname;
+
 	$('multiplayer').addEventListener('change', function (e) {
 		var nick = nick_input.value,
 			host = host_input.value;
@@ -875,7 +878,7 @@ $('start').addEventListener('click', function () {
 }());
 
 function startSocket(host, nick) {
-	socket = io.connect("http://" + host + ":3939");
+	socket = io.connect("http://" + host + ":" + SOCKET_PORT);
 	socket.on("connect", function () {
 		socket.emit("hello", nick);
 	});
