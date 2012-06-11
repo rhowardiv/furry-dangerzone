@@ -1,37 +1,33 @@
 /*jshint laxbreak: true, loopfunc: true*/
 var
+	// Setup our javascript framework
 	$ = function (id) { return document.getElementById(id); },
 
-	// Basic game parameters
+	// Game constants
 	BOARD_WIDTH = 8,
 	BOARD_HEIGHT = 17, // allow an extra top row for rotation
 	MAX_START_HEIGHT = 13,
 	NUM_COLORS = 3,
+	MATCH_PENDING = NUM_COLORS * 2 + 1, // state of a matched block
 	NUM_TO_MATCH = 4, // pieces in a row required for match
 	DEFAULT_LOOP_DELAY = 20,
-	// Max consecutive instances of any one color to start
-	START_MAX_IN_A_ROW = 2,
-	TICKS_TO_SPEEDUP = 600, // downward moves plus new pieces * 10; change to time?
+	START_MAX_IN_A_ROW = 2, // don't allow too many adjacent colors at start
+	TICKS_TO_SPEEDUP = 550, // downward moves plus new pieces * 10; change to time?
 	SPEEDUP_FACTOR = 0.8,
 	// starting speeds (ms between drops etc.)
 	SPEEDS = {
-		low: 800,
-		med: 630,
+		low: 780,
+		med: 620,
 		high: 460
 	},
 
-	// Game start parameters
-	speed = SPEEDS.low, // selected speed
-	level = 5,
-
-	// Bits that indicate connections
+	// A blocks connection(s) are stored as state in these bits
 	CONNECT_TOP = 0x0100,
 	CONNECT_RIGHT = 0x0200,
 	CONNECT_BOTTOM = 0x0400,
 	CONNECT_LEFT = 0x0800,
+	// A helper number representing any connection
 	CONNECTIONS = CONNECT_TOP | CONNECT_RIGHT | CONNECT_BOTTOM | CONNECT_LEFT,
-
-	MATCH_PENDING = NUM_COLORS * 2 + 1,
 
 	// New piece template
 	NEW_PIECE = [
@@ -50,11 +46,8 @@ var
 			return Array.isArray(arg) ? arg.map(fn) : fn(arg);
 		};
 	},
-	id = function (x) {
-		return x;
-	},
 
-	// How to move around
+	// How to move around the board
 	go = {
 		up: mappable(function (p) {
 			return (BOARD_HEIGHT - Math.floor(p / BOARD_WIDTH) - 1)
@@ -133,7 +126,7 @@ var
 			][o](ps);
 		}
 	},
-	// Direction constants
+	// Directional sugar
 	up = "up",
 	right = "right",
 	down = "down",
@@ -149,6 +142,8 @@ var
 		rotate_right: rotate_left
 	},
 
+	// A way to declare objects as literals with expressions as keys;
+	// not really necessary but I hate the alternative.
 	keysValues = function(array) {
 		var i, obj = {};
 		for (i = 0; i < array.length; i += 2) {
@@ -156,6 +151,7 @@ var
 		}
 		return obj;
 	},
+	// Some maps for connections
 	go_connect = keysValues([
 		CONNECT_TOP, go.up,
 		CONNECT_RIGHT, go.right,
@@ -168,6 +164,10 @@ var
 		CONNECT_BOTTOM, CONNECT_TOP,
 		CONNECT_LEFT, CONNECT_RIGHT
 	]),
+
+	id = function (x) {
+		return x;
+	},
 
 	// How to maintain connections (state) when moving
 	rotation_state = {
@@ -230,14 +230,16 @@ var
 		}
 	},
 	Renderer = function () {
-		var local_block_size;
+		var main_block_size;
 
-		return function (nick) {
+		// Construct a main board renderer (no argument) or enemy board
+		// renderer (one argument)
+		return function (enemy) {
 			return {
 				board_dom: null,
 				init: init,
 				block_size: 0,
-				setupBoardDom: nick ? setupBoardDomEnemy : setupBoardDom,
+				setupBoardDom: arguments.length > 0 ? setupBoardDomEnemy : setupBoardDom,
 				render: render,
 				destruct: destruct
 			};
@@ -268,29 +270,29 @@ var
 				screen_w = window.document.documentElement.clientWidth,
 				screen_h = window.document.documentElement.clientHeight;
 
-			local_block_size = Math.floor(0.95 * (
+			main_block_size = Math.floor(0.95 * (
 				Math.min(screen_w, screen_h) / Math.max(BOARD_WIDTH, BOARD_HEIGHT)
 			));
 
-			board_dom.style.width = local_block_size * BOARD_WIDTH + "px";
-			board_dom.style.height = local_block_size * BOARD_HEIGHT + "px";
+			board_dom.style.width = main_block_size * BOARD_WIDTH + "px";
+			board_dom.style.height = main_block_size * BOARD_HEIGHT + "px";
 
-			makeBlocks(board_dom, local_block_size);
+			makeBlocks(board_dom, main_block_size);
 			return board_dom;
 		}
 
 		function setupBoardDomEnemy(nick) {
 			var board_dom = document.createElement("div"),
-				block_size = Math.floor(local_block_size / 3),
+				block_size = Math.floor(main_block_size / 3),
 				name_dom = document.createElement("div");
 
-			board_dom.className = 'enemy-board';
+			board_dom.className = "enemy-board";
 			board_dom.style.width = block_size * BOARD_WIDTH + "px";
 			board_dom.style.height = block_size * BOARD_HEIGHT + "px";
 
 			makeBlocks(board_dom, block_size);
 			name_dom.innerHTML = nick;
-			name_dom.className = 'name';
+			name_dom.className = "name";
 			board_dom.appendChild(name_dom);
 			$("enemy-boards").appendChild(board_dom);
 			return board_dom;
@@ -315,23 +317,29 @@ var
 	// starting from the lower left. Possible states, where n = NUM_COLORS:
 	// -1 invalid (not on board)
 	//  0 empty
-	//  1 - n "enemy" blocks placed at start
+	//  1 - n monster blocks placed at start
 	//  n+1 - 2n player blocks
 	// 2n+1 matched blocks
 	//  ... Player block states can have the bits 2^8-11 flipped on to
 	// indicate bindings to the top, right, bottom and left, respectively.
 	board = [],
 
+	// todo: toss all game state into one object?
+
+	game_over = false,
 	// The controllable piece, if one exists
 	piece,
 	// Current speed; gets smaller
 	interval,
 
+	// Game settings
+	speed = SPEEDS.low, // selected speed
+	level = 5,
+
 	// socket.io multiplayer connection
 	socket,
 	SOCKET_PORT = 3939,
 	is_boss = false,
-	game_over = false,
 
 	// countdown to a speedup
 	speedupTick = function () {
@@ -346,6 +354,12 @@ var
 		};
 	}(),
 
+	/*
+	* Main controller
+	*
+	* Passes control between the various types of game loops; also
+	* throws game state at renderer whenever it changes.
+	*/
 	next = function () {
 		var prev_board;
 
@@ -382,7 +396,7 @@ var
 		};
 	}(),
 
-	// todo: pausing; this just starts for now
+	// todo: pausing; right now this just starts the game
 	playPause = function (socket_force) {
 		if (isGameStarted()) {
 			return; // no unpause yet
@@ -452,7 +466,7 @@ function canCascade(p, npps, from_conn) {
 	var below = go.down(p),
 		below_is_empty = board[below] === 0,
 		below_is_attached = from_conn === CONNECT_BOTTOM,
-		further_connections = (board[p] & (CONNECTIONS ^ from_conn)),
+		more_connections = (board[p] & (CONNECTIONS ^ from_conn)),
 		conn_check,
 		conn_cascades = [],
 		i;
@@ -466,7 +480,7 @@ function canCascade(p, npps, from_conn) {
 		return [];
 	}
 
-	if (further_connections === 0) {
+	if (more_connections === 0) {
 		return [p];
 	}
 
@@ -509,8 +523,16 @@ function cascadeScan() {
 	return npps;
 }
 
+/*
+ * Create the starting board.
+ *
+ * This may need to change to something a little more deterministic wrt
+ * the number of monsters generated, but it's okay for now.
+ */
 function initBoard() {
-	var START_HEIGHT = Math.floor(level * (MAX_START_HEIGHT / (BOARD_HEIGHT - 1)) / 20 * BOARD_HEIGHT),
+	var START_HEIGHT = Math.floor(
+			level * (MAX_START_HEIGHT / (BOARD_HEIGHT - 1)) / 20 * BOARD_HEIGHT
+		),
 		// Probabilistic density of pieces on starting board, between 0 (nothing)
 		// and 1 (completely full)
 		// This varies with level 5-20 between 0.5 and 0.75
@@ -554,20 +576,20 @@ function isWin() {
 
 function win(from_socket) {
 	gameOver();
-	if (!socket || from_socket) {
+	if (socket && !from_socket) {
+		socket.emit("win");
+	} else {
 		console.log("You WIN!");
-		return;
 	}
-	socket.emit("win");
 }
 
 function lose(from_socket) {
 	gameOver();
-	if (!socket || from_socket) {
+	if (socket && !from_socket) {
+		socket.emit("lose");
+	} else {
 		console.log("You LOSE!");
-		return;
 	}
-	socket.emit("lose");
 }
 
 function checkMove(direction) {
@@ -602,7 +624,10 @@ function move(direction) {
 	this.orientation = rotation_orient[direction](this.orientation);
 }
 
-function newPiece(now) {
+/*
+ * Constructor for a player-controlled piece.
+ */
+function Piece(now) {
 	var i, blocks = [];
 	for (i = 0; i < NEW_PIECE.length; i += 2) {
 		if (board[NEW_PIECE[i]] !== 0) {
@@ -623,15 +648,24 @@ function newPiece(now) {
 	return {
 		blocks: blocks,
 		orientation: 0,
+		// When the piece will move downward next
 		pending_drop: now + interval,
+		// When the piece will stick to the block below
 		pending_settle: 0,
 		pending_moves: [],
+		// If the player has triggered the all-the-way-down move
 		pending_slam: false,
+		// methods
 		move: move,
 		checkMove: checkMove
 	};
 }
 
+/*
+ * Constructor for a non-player piece.
+ *
+ * (Not a monster piece either; basically a cascading piece).
+ */
 function newNpp(p) {
 	return {
 		blocks: [p],
@@ -641,6 +675,7 @@ function newNpp(p) {
 	};
 }
 
+// Find if the block is in the npps
 function nppsSearch(p, npps) {
 	var i, j;
 	for (i = 0; i < npps.length; i++) {
@@ -653,34 +688,35 @@ function nppsSearch(p, npps) {
 	return -1;
 }
 
+// Remove the connection from the piece connected to.
 function removeConnectionComplement(p) {
 	var target = go_connect[board[p] & CONNECTIONS](p);
 	board[target] = board[target] & ~CONNECTIONS;
 }
 
+// Controller for when the player is moving the piece, or the board is
+// ready for a new piece.
 function playerLoop() {
 	var now = +new Date(),
 		i, j,
 		m,
-		check_match = [],
-		matches = [],
-		npps = [];
+		matches = [];
 
 	if (!piece) {
-		piece = newPiece(now);
+		piece = Piece(now);
 		if (!piece) {
 			lose();
 			return;
 		}
 		speedupTick(10);
+		next(playerLoop);
+		return;
 	}
 
 	if (piece.pending_settle) {
 		if (piece.pending_settle <= now) {
 			piece = false;
-
 			matches = matchScan();
-
 			if (matches.length > 0) {
 				next(setMatches, [matches], interval);
 				return;
@@ -706,8 +742,8 @@ function playerLoop() {
 			speedupTick();
 		} else {
 			if (piece.pending_settle && piece.checkMove(down)) {
-				// Unset the settle timer and re-set drop timer if the move has
-				// resulted in more possible down moves.
+				// Unset the settle timer and re-set drop timer if the
+				// move has resulted in more possible down moves.
 				piece.pending_settle = 0;
 				piece.pending_drop = now + interval;
 			}
@@ -722,6 +758,11 @@ function playerLoop() {
 	next(playerLoop);
 }
 
+/* Attempt to execute a player move
+ *
+ * I think this needs a little work in the (literal) edge case for
+ * rotations.
+ */
 function playerMove(m) {
 	if (piece.checkMove(m)) {
 		piece.move(m);
@@ -737,7 +778,6 @@ function playerMove(m) {
 	m = opposite[m];
 
 	if (!piece.checkMove(m)) {
-
 		piece.blocks.reverse();
 		piece.orientation = (2 + piece.orientation) % 4;
 		m = opposite[m];
@@ -749,17 +789,18 @@ function playerMove(m) {
 	return true;
 }
 
-function nppSort(npp1, npp2) {
+function nppCompare(npp1, npp2) {
 	return npp1.blocks[0] - npp2.blocks[0];
 }
 
+// Controller for when a cascade is happening.
 function cascadeLoop(npps) {
 	var i,
 		matches,
 		new_npps;
 
 	// Move the lowest npps first
-	npps.sort(nppSort);
+	npps.sort(nppCompare);
 
 	for (i = 0; i < npps.length; i++) {
 		npps[i].move(down);
@@ -781,6 +822,7 @@ function cascadeLoop(npps) {
 	);
 }
 
+// Controller for when matches have been made.
 function setMatches(matches) {
 	var i;
 	for (i = 0; i < matches.length; i++) {
@@ -793,6 +835,7 @@ function setMatches(matches) {
 	next(clearMatches, [matches], interval);
 }
 
+// Controller for when matches are ready to be cleared.
 function clearMatches(matches) {
 	var i,
 		npps = [];
@@ -807,7 +850,7 @@ function clearMatches(matches) {
 
 	npps = cascadeScan();
 	next.apply(null, (npps.length > 0)
-		? [cascadeLoop, [npps], interval]
+		? [cascadeLoop, [npps]]
 		: [playerLoop]
 	);
 }
@@ -819,6 +862,11 @@ function queueMove(direction) {
 }
 
 renderer.init();
+
+/*
+ * Set up controls
+ */
+
 $('start').addEventListener('click', function () {
 	playPause();
 });
@@ -828,6 +876,7 @@ $('start').addEventListener('click', function () {
 		speed_box = $('speed'),
 		speed_keys = Object.keys(SPEEDS);
 
+	// make sure speed control matches actual speed
 	for (i = 0; i < speed_keys.length; i++) {
 		if (speed === SPEEDS[speed_keys[i]]) {
 			speed_box.className = speed_keys[i];
@@ -874,9 +923,7 @@ $('start').addEventListener('click', function () {
 		if (nick && host) {
 			startSocket(host, nick);
 		}
-
 	});
-
 }());
 
 function startSocket(host, nick) {
@@ -942,6 +989,7 @@ window.addEventListener('keydown', function (e) {
 			return false;
 		case 27: // ESC
 			if (isGameStarted()) {
+				console.log("FORFEIT!");
 				lose();
 			}
 			return false;

@@ -10,7 +10,9 @@ var PORT = 3939,
 	clients = {},
 	// times of connections, keyed by nicknames
 	connect_times = {},
+	// nickname of current boss player; only boss can start game
 	boss,
+	// if no one wins outright, someone will win by attrition
 	attrition = {};
 
 io.set("log level", 1);
@@ -51,7 +53,8 @@ io.sockets.on("connection", function (socket) {
 			boss = null;
 			pickNewBoss();
 		}
-		if (winner = findWinnerByAttrition()) {
+		var winner = findWinnerByAttrition();
+		if (winner) {
 			clients[winner].broadcast.emit("lose");
 			clients[winner].emit("win");
 			attrition = {};
@@ -77,7 +80,8 @@ io.sockets.on("connection", function (socket) {
 	});
 	socket.on("lose", function () {
 		delete attrition[socket_id];
-		if (winner = findWinnerByAttrition()) {
+		var winner = findWinnerByAttrition();
+		if (winner) {
 			clients[winner].broadcast.emit("lose");
 			clients[winner].emit("win");
 			attrition = {};
