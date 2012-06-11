@@ -1,5 +1,8 @@
 <!DOCTYPE html>
 <style>
+	body {
+		font-family: sans-serif;
+	}
 	a {
 		cursor: pointer;
 	}
@@ -11,6 +14,11 @@
 	}
 	ul.controls {
 		padding-left: 0;
+	}
+	.label {
+		color: #333;
+		font-size: 0.9em;
+		font-weight: normal;
 	}
 	.board {
 		position: absolute;
@@ -46,6 +54,16 @@
 	.med .med,
 	.high .high {
 		color: #600;
+	}
+	.start-item {
+		margin-top: 0.5em;
+	}
+	.start {
+		padding: 0.3em 0.5em;
+		border: 0.2em solid orange;
+		background: purple;
+		color: yellow;
+		font-weight: bold;
 	}
 	.c0 {
 		background-color: black;
@@ -115,24 +133,25 @@
 </style>
 <ul class="controls">
 	<li id="speed">
+		<label class="label">speed: </label>
 		<a id="speed-low" class="low">low</a>
 		<a id="speed-med" class="med">med</a>
 		<a id="speed-high" class="high">high</a>
 	</li>
 	<li id="level">
-		<label>level
+		<label class="label">level
 			<input id="level-input" type="range" min=5 max=20 value=5 step=1>
 		</label>
 		<span id="level-show">5</span>
 	</li>
 	<li id="server">
 		<fieldset id="multiplayer">
-			<legend>Multiplayer server</legend>
+			<legend class="label">Multiplayer server</legend>
 			<input type="text" id="host" placeholder="host">
 			<input type="text" id="nickname" placeholder="nickname">
 		</fieldset>
 	</li>
-	<li>
+	<li class="start-item">
 		<a id="start" class="start">start</a>
 	</li>
 </ul>
