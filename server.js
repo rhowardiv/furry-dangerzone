@@ -13,6 +13,8 @@ var PORT = 3939,
 	boss,
 	attrition = {};
 
+io.set("log level", 1);
+
 io.sockets.on("connection", function (socket) {
 
 	var socket_id;
