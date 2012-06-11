@@ -9,19 +9,19 @@ var
 	NUM_COLORS = 3,
 	NUM_TO_MATCH = 4, // pieces in a row required for match
 	DEFAULT_LOOP_DELAY = 20,
+	// Max consecutive instances of any one color to start
+	START_MAX_IN_A_ROW = 2,
 	TICKS_TO_SPEEDUP = 600, // downward moves plus new pieces * 10; change to time?
 	SPEEDUP_FACTOR = 0.8,
-	SPEED = {
+	// starting speeds (ms between drops etc.)
+	SPEEDS = {
 		low: 800,
 		med: 630,
 		high: 460
 	},
-	// Max consecutive instances of any one color to start
-	START_MAX_IN_A_ROW = 2,
 
 	// Game start parameters
-
-	interval = SPEED.low, // starting speed; ms for a drop, etc.
+	speed = SPEEDS.low, // selected speed
 	level = 5,
 
 	// Bits that indicate connections
@@ -324,6 +324,8 @@ var
 
 	// The controllable piece, if one exists
 	piece,
+	// Current speed; gets smaller
+	interval,
 
 	// socket.io multiplayer connection
 	socket,
@@ -395,6 +397,7 @@ var
 			}
 		}
 		game_over = false;
+		interval = speed;
 		initBoard();
 		next(playerLoop);
 	};
@@ -788,7 +791,6 @@ function setMatches(matches) {
 		board[matches[i]] = MATCH_PENDING;
 	}
 	next(clearMatches, [matches], interval);
-
 }
 
 function clearMatches(matches) {
@@ -824,11 +826,11 @@ $('start').addEventListener('click', function () {
 (function bindSpeed() {
 	var i,
 		speed_box = $('speed'),
-		speeds = Object.keys(SPEED);
+		speed_keys = Object.keys(SPEEDS);
 
-	for (i = 0; i < speeds.length; i++) {
-		if (interval === SPEED[speeds[i]]) {
-			speed_box.className = speeds[i];
+	for (i = 0; i < speed_keys.length; i++) {
+		if (speed === SPEEDS[speed_keys[i]]) {
+			speed_box.className = speed_keys[i];
 		}
 	}
 
@@ -836,9 +838,9 @@ $('start').addEventListener('click', function () {
 		if (isGameStarted()) {
 			return;
 		}
-		if (Object.keys(SPEED).indexOf(e.target.className) > -1) {
+		if (Object.keys(SPEEDS).indexOf(e.target.className) > -1) {
 			speed_box.className = e.target.className;
-			interval = SPEED[e.target.className];
+			speed = SPEEDS[e.target.className];
 		}
 	});
 }());
