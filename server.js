@@ -4,7 +4,7 @@
  * NODE_PATH=/path/to/node_modules node server.js
  */
 
-var PORT = 3939,
+var PORT = 13939,
 	io = require("socket.io").listen(PORT),
 	// sockets keyed by nicknames
 	clients = {},

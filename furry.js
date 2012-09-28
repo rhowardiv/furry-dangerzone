@@ -338,7 +338,7 @@ var
 
 	// socket.io multiplayer connection
 	socket,
-	SOCKET_PORT = 3939,
+	SOCKET_PORT = 13939,
 	is_boss = false,
 
 	// countdown to a speedup
