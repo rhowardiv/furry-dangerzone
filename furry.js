@@ -302,7 +302,10 @@ var
 			var i, c = this.board_dom.childNodes;
 			for (i = 0; i < board.length; i++) {
 				c[i].className = "block c" + (board[i] % 256)
-					+ " b" + (board[i] >> 8);
+					+ " b" + (board[i] >> 8)
+					// for debugging; raw piece state
+					+ " n" + (board[i])
+				;
 			}
 		}
 
