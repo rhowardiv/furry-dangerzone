@@ -578,11 +578,16 @@ function cascadeScan() {
 }
 
 function checkCombo(combo) {
-	if (socket && combo.length > 1 || combo[0].length > 4) {
-		socket.emit("neener", combo);
+	var i, clean_combo = [];
+	if (socket && combo.length > 1 || combo[0].length > 5) {
+		// uniqify
+		for (i = 0; i < combo.length; i++) {
+			if (clean_combo.indexOf(combo[i]) === -1) {
+				clean_combo.push(combo[i]);
+			}
+		}
+		socket.emit("neener", clean_combo);
 		console.log('Nice combo! You neenered someone.');
-	} else {
-		console.log('Not bad');
 	}
 }
 
