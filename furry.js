@@ -21,7 +21,7 @@ var
 		high: 460
 	},
 
-	// A blocks connection(s) are stored as state in these bits
+	// A block's connections are stored as state in these bits
 	CONNECT_TOP = 0x0100,
 	CONNECT_RIGHT = 0x0200,
 	CONNECT_BOTTOM = 0x0400,
