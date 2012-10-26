@@ -354,6 +354,57 @@ var
 		};
 	}(),
 
+	// get or set a pending neener
+	pendingNeener = (function () {
+		var neener;
+
+		function neenerPlace(ps, length, n) {
+			var i, p, left, right;
+
+			// tentatively put a piece down
+			p = Math.floor((length * Math.random()));
+
+			// Any more points to place?
+			if (n === 1) {
+				// No--done!
+				return p;
+			}
+
+			// see how many pieces will fit left and right
+			left = Math.floor(p / 2);
+			right = Math.floor((length - 1 - p) / 2);
+
+			// hmmm
+
+			return p;
+		}
+
+		function generateNeener(combo) {
+			var i, n = 0, ps;
+			for (i = 0; i < combo.length; i++) {
+				n += Math.min(1, combo[i].length - 4);
+			}
+			n = Math.max(n, 4);
+			ps = placeAndBisect([], BOARD_WIDTH, n);
+			for (i = 0; i < ps.length; i++) {
+				// new npp blah blah
+			}
+		}
+
+		return function () {
+			if (arguments.length === 1) {
+				//neener = generateNeener(arguments[0]);
+				console.log('implement neener generation');
+				return;
+			}
+
+			console.log('implement neener pending query');
+			var r = neener;
+			neener = undefined;
+			return r;
+		};
+	}()),
+
 	/*
 	* Main controller
 	*
@@ -521,6 +572,15 @@ function cascadeScan() {
 		}
 	}
 	return npps;
+}
+
+function checkCombo(combo) {
+	if (socket && combo.length > 1 || combo[0].length > 4) {
+		socket.emit("neener", combo);
+		console.log('Nice combo! You neenered someone.');
+	} else {
+		console.log('Not bad');
+	}
 }
 
 /*
@@ -718,7 +778,7 @@ function playerLoop() {
 			piece = false;
 			matches = matchScan();
 			if (matches.length > 0) {
-				next(setMatches, [matches], interval);
+				next(setMatches, [matches, [matches]], interval);
 				return;
 			}
 			next(playerLoop);
@@ -794,7 +854,7 @@ function nppCompare(npp1, npp2) {
 }
 
 // Controller for when a cascade is happening.
-function cascadeLoop(npps) {
+function cascadeLoop(npps, combo) {
 	var i,
 		matches,
 		new_npps;
@@ -811,19 +871,22 @@ function cascadeLoop(npps) {
 	if (new_npps.length < npps.length) {
 		matches = matchScan();
 		if (matches.length > 0) {
-			next(setMatches, [matches], interval);
+			combo.push(matches);
+			next(setMatches, [matches, combo], interval);
 			return;
 		}
 	}
 
-	next.apply(null, (new_npps.length > 0)
-		? [cascadeLoop, [new_npps], interval]
-		: [playerLoop]
-	);
+	if (new_npps.length > 0) {
+		next(cascadeLoop, [new_npps, combo], interval);
+	} else {
+		checkCombo(combo);
+		next(playerLoop);
+	}
 }
 
 // Controller for when matches have been made.
-function setMatches(matches) {
+function setMatches(matches, combo) {
 	var i;
 	for (i = 0; i < matches.length; i++) {
 		if (board[matches[i]] & CONNECTIONS) {
@@ -832,11 +895,11 @@ function setMatches(matches) {
 
 		board[matches[i]] = MATCH_PENDING;
 	}
-	next(clearMatches, [matches], interval);
+	next(clearMatches, [matches, combo], interval);
 }
 
 // Controller for when matches are ready to be cleared.
-function clearMatches(matches) {
+function clearMatches(matches, combo) {
 	var i,
 		npps = [];
 
@@ -849,10 +912,13 @@ function clearMatches(matches) {
 	}
 
 	npps = cascadeScan();
-	next.apply(null, (npps.length > 0)
-		? [cascadeLoop, [npps]]
-		: [playerLoop]
-	);
+
+	if (npps.length > 0) {
+		next(cascadeLoop, [npps, combo]);
+	} else {
+		checkCombo(combo);
+		next(playerLoop);
+	}
 }
 
 function queueMove(direction) {
@@ -957,6 +1023,12 @@ function startSocket(host, nick) {
 	});
 	socket.on("win", function () {
 		win(true);
+	});
+	socket.on("neener", function (combo) {
+		console.log('caught neener emit');
+		pendingNeener(combo);
+		console.log('pendingNeener called with combo:');
+		console.log(combo);
 	});
 }
 

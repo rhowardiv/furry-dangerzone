@@ -88,10 +88,10 @@ io.sockets.on("connection", function (socket) {
 		}
 	});
 	socket.on("neener", function (combo) {
-		var target_ix = Math.floor(Math.random() * (clients.length - 1)),
-			client_ids = Object.keys(clients);
+		var client_ids = Object.keys(clients),
+			target_ix = Math.floor(Math.random() * (client_ids.length - 1));
 		if (client_ids[target_ix] === socket_id) {
-			target_ix = clients.length - 1;
+			target_ix = (target_ix + 1) % client_ids.length;
 		}
 		clients[client_ids[target_ix]].emit("neener", combo);
 	});
