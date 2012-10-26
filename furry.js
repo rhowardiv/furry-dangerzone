@@ -144,26 +144,26 @@ var
 
 	// A way to declare objects as literals with expressions as keys;
 	// not really necessary but I hate the alternative.
-	keysValues = function(array) {
+	keysValues = function() {
 		var i, obj = {};
-		for (i = 0; i < array.length; i += 2) {
-			obj[array[i]] = array[i + 1];
+		for (i = 0; i < arguments.length; i += 2) {
+			obj[arguments[i]] = arguments[i + 1];
 		}
 		return obj;
 	},
 	// Some maps for connections
-	go_connect = keysValues([
+	go_connect = keysValues(
 		CONNECT_TOP, go.up,
 		CONNECT_RIGHT, go.right,
 		CONNECT_BOTTOM, go.down,
 		CONNECT_LEFT, go.left
-	]),
-	opposite_connection = keysValues([
+	),
+	opposite_connection = keysValues(
 		CONNECT_TOP, CONNECT_BOTTOM,
 		CONNECT_RIGHT, CONNECT_LEFT,
 		CONNECT_BOTTOM, CONNECT_TOP,
 		CONNECT_LEFT, CONNECT_RIGHT
-	]),
+	),
 
 	id = function (x) {
 		return x;
