@@ -87,6 +87,14 @@ io.sockets.on("connection", function (socket) {
 			attrition = {};
 		}
 	});
+	socket.on("neener", function (combo) {
+		var target_ix = Math.floor(Math.random() * (clients.length - 1)),
+			client_ids = Object.keys(clients);
+		if (client_ids[target_ix] === socket_id) {
+			target_ix = clients.length - 1;
+		}
+		clients[client_ids[target_ix]].emit("neener", combo);
+	});
 });
 
 function setBoss(socket_id) {
