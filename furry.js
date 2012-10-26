@@ -69,7 +69,7 @@ var
 			? (p - 1)
 			: -1;
 		}),
-		rotate_left: function (ps, o) {
+		rotate_left: function (ps, oriented) {
 			return [
 				function (ps) {
 					return [
@@ -95,9 +95,9 @@ var
 						go.right(ps[1])
 					];
 				}
-			][o](ps);
+			][oriented](ps);
 		},
-		rotate_right: function (ps, o) {
+		rotate_right: function (ps, oriented) {
 			return [
 				function (ps) {
 					return [
@@ -123,7 +123,7 @@ var
 						go.left(ps[1])
 					];
 				}
-			][o](ps);
+			][oriented](ps);
 		}
 	},
 	// Directional sugar
@@ -175,7 +175,7 @@ var
 		right: mappable(id),
 		down: mappable(id),
 		left: mappable(id),
-		rotate_left: function (ss, o) {
+		rotate_left: function (ss, oriented) {
 			return [
 				function (ss) { return [
 					(ss[0] ^ CONNECT_RIGHT) | CONNECT_TOP,
@@ -193,9 +193,9 @@ var
 					(ss[0] ^ CONNECT_BOTTOM) | CONNECT_RIGHT,
 					(ss[1] ^ CONNECT_TOP) | CONNECT_LEFT
 				]; }
-			][o](ss);
+			][oriented](ss);
 		},
-		rotate_right: function (ss, o) {
+		rotate_right: function (ss, oriented) {
 			return [
 				function (ss) { return [
 					(ss[0] ^ CONNECT_RIGHT) | CONNECT_BOTTOM,
@@ -213,7 +213,7 @@ var
 					(ss[0] ^ CONNECT_BOTTOM) | CONNECT_LEFT,
 					(ss[1] ^ CONNECT_TOP) | CONNECT_RIGHT
 				]; }
-			][o](ss);
+			][oriented](ss);
 		}
 	},
 	// How orientation changes when moving
