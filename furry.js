@@ -386,13 +386,15 @@ var
 
 		function generateNeener(combo) {
 			var i,
-				n = 0,
+				n = combo.length - 1,
 				slots = getPotentialSlots(),
 				left_to_place;
 
 			for (i = 0; i < combo.length; i++) {
-				n += Math.max(1, combo[i].length - 4);
+				// for extra fun -- matches > 4 count as extra neeners
+				n += Math.max(0, combo[i].length - 4);
 			}
+
 			n = Math.min(n, Math.floor(slots.length / 2));
 			for (i = 0; i < n && slots.length > 0; i++) {
 				left_to_place = n - i;
@@ -1092,16 +1094,16 @@ window.addEventListener('keydown', function (e) {
 
 		// test neener generation
 		case 49: // 1
-			pendingNeener([[]]);
-			return false;
-		case 50: // 2
 			pendingNeener([[], []]);
 			return false;
-		case 51: // 3
+		case 50: // 2
 			pendingNeener([[], [], []]);
 			return false;
-		case 52: // 4
+		case 51: // 3
 			pendingNeener([[], [], [], []]);
+			return false;
+		case 52: // 4
+			pendingNeener([[], [], [], [], []]);
 			return false;
 
 		// currently not using these keys
