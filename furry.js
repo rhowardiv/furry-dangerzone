@@ -359,52 +359,60 @@ var
 
 	// get or set a pending neener
 	pendingNeener = (function () {
-		var neener;
+		// neeners may have to be queued fifo!
+		var combos = [],
+			last_slot = BOARD_HEIGHT * BOARD_WIDTH - 1,
+			first_slot = last_slot + 1 - BOARD_WIDTH;
 
-		function neenerPlace(ps, length, n) {
-			var i, p, left, right;
+		function getPotentialSlots() {
+			var i,
+				l = -1,
+				r,
+				available = [];
 
-			// tentatively put a piece down
-			p = Math.floor((length * Math.random()));
-
-			// Any more points to place?
-			if (n === 1) {
-				// No--done!
-				return p;
+			for (i = first_slot; i <= last_slot; i++) {
+				r = go.right(i);
+				if (
+					board[i] === 0
+					&& (l === -1 || board[l] === 0)
+					&& (r === -1 || board[r] === 0)
+				) {
+					available.push(i);
+				}
+				l = i;
 			}
-
-			// see how many pieces will fit left and right
-			left = Math.floor(p / 2);
-			right = Math.floor((length - 1 - p) / 2);
-
-			// hmmm
-
-			return p;
+				return available;
 		}
 
 		function generateNeener(combo) {
-			var i, n = 0, ps;
+			var i,
+				n = 0,
+				slots = getPotentialSlots(),
+				left_to_place;
+
 			for (i = 0; i < combo.length; i++) {
-				n += Math.min(1, combo[i].length - 4);
+				n += Math.max(1, combo[i].length - 4);
 			}
-			n = Math.max(n, 4);
-			ps = placeAndBisect([], BOARD_WIDTH, n);
-			for (i = 0; i < ps.length; i++) {
-				// new npp blah blah
+			n = Math.min(n, Math.floor(slots.length / 2));
+			for (i = 0; i < n && slots.length > 0; i++) {
+				left_to_place = n - i;
+				slot_ix = left_to_place > slots.length / 2
+					? 0
+					: left_to_place === slots.length / 2
+					? (Math.random() > 0.5 ? 0 : 1)
+					: Math.floor(Math.random() * slots.length);
+				board[slots[slot_ix]] = Math.floor(Math.random() * NUM_COLORS) + NUM_COLORS + 1;
+				slots = getPotentialSlots();
 			}
+			return i;
 		}
 
 		return function () {
-			if (arguments.length === 1) {
-				//neener = generateNeener(arguments[0]);
-				console.log('implement neener generation');
+			if (arguments.length > 0) {
+				combos.push(arguments[0]);
 				return;
 			}
-
-			console.log('implement neener pending query');
-			var r = neener;
-			neener = undefined;
-			return r;
+			return combos.length > 0 ? generateNeener(combos.shift()) : 0;
 		};
 	}()),
 
@@ -578,12 +586,18 @@ function cascadeScan() {
 }
 
 function checkCombo(combo) {
-	var i, clean_combo = [];
-	if (socket && combo.length > 1 || combo[0].length > 5) {
+	var i, j, clean_combo = [];
+	if (
+		socket
+		&& (combo.length > 1 || (combo.length === 1 && combo[0].length > 5))
+	) {
 		// uniqify
 		for (i = 0; i < combo.length; i++) {
-			if (clean_combo.indexOf(combo[i]) === -1) {
-				clean_combo.push(combo[i]);
+			clean_combo[i] = [];
+			for (j = 0; j < combo[i].length; j++) {
+				if (j === 0 || clean_combo[i].indexOf(combo[i][j]) === -1) {
+					clean_combo[i].push(combo[i][j]);
+				}
 			}
 		}
 		socket.emit("neener", clean_combo);
@@ -704,7 +718,7 @@ function Piece(now) {
 		}
 		board[NEW_PIECE[i]] = Math.floor(
 			// a random color
-			Math.random() * (NUM_COLORS)
+			Math.random() * NUM_COLORS
 			// set state for player piece
 			+ NUM_COLORS + 1
 			// set connection
@@ -768,9 +782,16 @@ function playerLoop() {
 	var now = +new Date(),
 		i, j,
 		m,
-		matches = [];
+		matches = [],
+		neeners;
 
 	if (!piece) {
+		if (pendingNeener() > 0) {
+			neeners = cascadeScan();
+			if (neeners) {
+				return next(cascadeLoop, [neeners, []], interval);
+			}
+		}
 		piece = Piece(now);
 		if (!piece) {
 			lose();
@@ -1032,12 +1053,7 @@ function startSocket(host, nick) {
 	socket.on("win", function () {
 		win(true);
 	});
-	socket.on("neener", function (combo) {
-		console.log('caught neener emit');
-		pendingNeener(combo);
-		console.log('pendingNeener called with combo:');
-		console.log(combo);
-	});
+	socket.on("neener", pendingNeener);
 }
 
 window.addEventListener('keydown', function (e) {
@@ -1072,6 +1088,20 @@ window.addEventListener('keydown', function (e) {
 				console.log("FORFEIT!");
 				lose();
 			}
+			return false;
+
+		// test neener generation
+		case 49: // 1
+			pendingNeener([[]]);
+			return false;
+		case 50: // 2
+			pendingNeener([[], []]);
+			return false;
+		case 51: // 3
+			pendingNeener([[], [], []]);
+			return false;
+		case 52: // 4
+			pendingNeener([[], [], [], []]);
 			return false;
 
 		// currently not using these keys
